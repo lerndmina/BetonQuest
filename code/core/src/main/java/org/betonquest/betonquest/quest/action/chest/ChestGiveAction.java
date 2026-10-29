@@ -55,11 +55,12 @@ public class ChestGiveAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), location.getValue(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
-        final Block block = location.getValue(profile).getBlock();
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
+        final Block block = resolvedLocation.getBlock();
         final InventoryHolder chest;
         try {
             chest = (InventoryHolder) block.getState(false);

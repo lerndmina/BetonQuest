@@ -79,13 +79,14 @@ public class ChestTakeAction extends AbstractChestAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), getLocation(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = getLocation(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         try {
             final boolean abort = this.abort.getValue(profile).orElse(false);
-            final Inventory inventory = getChest(profile).getInventory();
+            final Inventory inventory = getChest(resolvedLocation).getInventory();
             final ItemStack[] inventoryContents = inventory.getContents();
             boolean anyNotTaken = false;
             for (final ItemWrapper item : items.getValue(profile)) {

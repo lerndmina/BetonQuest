@@ -39,16 +39,16 @@ public class LightningAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), location.getValue(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
-        final Location loc = location.getValue(profile);
-        final World world = loc.getWorld();
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
+        final World world = resolvedLocation.getWorld();
         if (noDamage.getValue(profile).orElse(false)) {
-            world.strikeLightningEffect(loc);
+            world.strikeLightningEffect(resolvedLocation);
         } else {
-            world.strikeLightning(loc);
+            world.strikeLightning(resolvedLocation);
         }
     }
 

@@ -76,15 +76,15 @@ public class RemoveEntityAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), loc.getValue(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = loc.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
-        final Location location = loc.getValue(profile);
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         final Component name = this.name == null ? null : this.name.getValue(profile);
         final String resolvedMarked = marked == null ? null : marked.getValue(profile);
         final double resolvedRange = range.getValue(profile).doubleValue();
-        final List<Entity> entities = EntityUtils.getSelectedEntity(location, name, resolvedMarked, resolvedRange);
+        final List<Entity> entities = EntityUtils.getSelectedEntity(resolvedLocation, name, resolvedMarked, resolvedRange);
         for (final EntityType type : types.getValue(profile)) {
             removeEntities(profile, type, entities);
         }

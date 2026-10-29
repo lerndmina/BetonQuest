@@ -46,13 +46,13 @@ public class SetBlockAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), this.location.getValue(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = this.location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
-        final Location location = this.location.getValue(profile);
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         final BlockSelector blockSelector = selector.getValue(profile);
-        blockSelector.setToBlock(location.getBlock(), !ignorePhysics.getValue(profile).orElse(false));
+        blockSelector.setToBlock(resolvedLocation.getBlock(), !ignorePhysics.getValue(profile).orElse(false));
     }
 
     @Override

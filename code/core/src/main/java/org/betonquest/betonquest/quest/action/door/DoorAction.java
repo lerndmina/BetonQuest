@@ -43,11 +43,11 @@ public class DoorAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), location.getValue(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
-        final Location resolvedLocation = location.getValue(profile);
+    private void executeInRegion(final Location resolvedLocation) throws QuestException {
         final Block block = resolvedLocation.getBlock();
         final BlockData blockData = block.getBlockData();
 

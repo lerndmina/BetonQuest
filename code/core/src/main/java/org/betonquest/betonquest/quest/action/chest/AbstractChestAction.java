@@ -42,12 +42,12 @@ public abstract class AbstractChestAction implements NullableAction {
     /**
      * Returns the chest at the specified location.
      *
-     * @param profile the profile of the player
+     * @param resolvedLocation the already resolved location of the chest
      * @return the chest {@link InventoryHolder} at the specified location
      * @throws QuestException if there is no chest at the specified location
      */
-    protected InventoryHolder getChest(@Nullable final Profile profile) throws QuestException {
-        final Block block = location.getValue(profile).getBlock();
+    protected InventoryHolder getChest(final Location resolvedLocation) throws QuestException {
+        final Block block = resolvedLocation.getBlock();
         try {
             return (InventoryHolder) block.getState(false);
         } catch (final ClassCastException e) {

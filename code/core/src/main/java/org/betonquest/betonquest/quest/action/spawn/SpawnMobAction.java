@@ -73,14 +73,14 @@ public class SpawnMobAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), this.location.getValue(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = this.location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
-        final Location location = this.location.getValue(profile);
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         final int numberOfMob = amount.getValue(profile).intValue();
         for (int i = 0; i < numberOfMob; i++) {
-            final Mob mob = (Mob) location.getWorld().spawnEntity(location, type.getValue(profile));
+            final Mob mob = (Mob) resolvedLocation.getWorld().spawnEntity(resolvedLocation, type.getValue(profile));
             this.equipment.addEquipment(profile, mob);
             this.equipment.addDrops(mob, profile);
             if (this.name != null) {

@@ -25,12 +25,13 @@ public class ChestClearAction extends AbstractChestAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), getLocation(profile), () -> executeInRegion(profile));
+        final Location resolvedLocation = getLocation(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(resolvedLocation));
     }
 
-    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
+    private void executeInRegion(final Location resolvedLocation) throws QuestException {
         try {
-            final InventoryHolder chest = getChest(profile);
+            final InventoryHolder chest = getChest(resolvedLocation);
             chest.getInventory().clear();
         } catch (final QuestException e) {
             throw new QuestException("Trying to clear chest. " + e.getMessage(), e);
