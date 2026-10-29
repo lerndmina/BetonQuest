@@ -1,8 +1,10 @@
 package org.betonquest.betonquest.quest.action.chest;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.inventory.InventoryHolder;
 import org.jetbrains.annotations.Nullable;
@@ -23,6 +25,10 @@ public class ChestClearAction extends AbstractChestAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), getLocation(profile), () -> executeInRegion(profile));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
         try {
             final InventoryHolder chest = getChest(profile);
             chest.getInventory().clear();

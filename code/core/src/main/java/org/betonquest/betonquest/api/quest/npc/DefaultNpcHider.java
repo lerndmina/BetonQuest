@@ -14,11 +14,12 @@ import org.betonquest.betonquest.api.service.identifier.Identifiers;
 import org.betonquest.betonquest.api.service.instruction.Instructions;
 import org.betonquest.betonquest.api.service.npc.NpcManager;
 import org.betonquest.betonquest.api.service.npc.NpcRegistry;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Hides (or shows) Npcs based on conditions defined in the {@code hide_npcs} section of a {@link QuestPackage}.
@@ -77,7 +79,13 @@ public class DefaultNpcHider {
      * The task refreshing npc visibility.
      */
     @Nullable
-    private BukkitTask task;
+    private TaskHandle task;
+
+    /**
+     * The plugin scheduling the visibility updates, set on the first reload.
+     */
+    @Nullable
+    private Plugin plugin;
 
     /**
      * Create and start a new Npc Hider.
@@ -147,16 +155,12 @@ public class DefaultNpcHider {
         if (task != null) {
             task.cancel();
         }
+        this.plugin = plugin;
         npcs.clear();
         if (updateInterval <= 0) {
             return;
         }
-        task = new BukkitRunnable() {
-            @Override
-            public void run() {
-                applyVisibility();
-            }
-        }.runTaskTimer(plugin, 0, updateInterval);
+        task = Scheduling.runGlobalTimer(plugin, scheduled -> applyVisibility(), 1, updateInterval);
     }
 
     /**
@@ -246,19 +250,27 @@ public class DefaultNpcHider {
      * @param npcId the id of the Npc
      */
     public void applyVisibility(final NpcIdentifier npcId) {
-        for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
-            applyVisibility(onlineProfile, npcId);
-        }
+        forEachOnlineProfile(onlineProfile -> applyVisibility(onlineProfile, npcId));
     }
 
     /**
      * Updates the visibility of all Npcs for all OnlineProfiles.
      */
     public void applyVisibility() {
-        for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
-            for (final NpcIdentifier npcId : npcs.keySet()) {
-                applyVisibility(onlineProfile, npcId);
-            }
+        forEachOnlineProfile(this::applyVisibility);
+    }
+
+    /**
+     * Runs the task per online profile on the thread owning the player.
+     *
+     * @param task the task
+     */
+    private void forEachOnlineProfile(final Consumer<OnlineProfile> task) {
+        final Plugin owner = plugin;
+        if (owner == null) {
+            profileProvider.getOnlineProfiles().forEach(task);
+            return;
         }
+        ProfileThreads.forEach(owner, profileProvider.getOnlineProfiles(), task);
     }
 }

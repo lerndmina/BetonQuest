@@ -1,9 +1,11 @@
 package org.betonquest.betonquest.quest.action.weather;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,6 +44,10 @@ public class WeatherAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        Scheduling.runQuestGlobal(BetonQuest.getInstance(), () -> executeGlobal(profile));
+    }
+
+    private void executeGlobal(@Nullable final Profile profile) throws QuestException {
         final World world = this.world.getValue(profile);
         weather.getValue(profile).applyTo(world, duration.getValue(profile).intValue());
     }

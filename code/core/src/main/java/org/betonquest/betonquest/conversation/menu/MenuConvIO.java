@@ -15,7 +15,8 @@ import org.betonquest.betonquest.conversation.menu.display.Display;
 import org.betonquest.betonquest.conversation.menu.display.Scroll;
 import org.betonquest.betonquest.conversation.menu.input.ConversationAction;
 import org.betonquest.betonquest.conversation.menu.input.ConversationSession;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -27,7 +28,6 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -88,7 +88,7 @@ public class MenuConvIO extends ChatConvIO {
      * The runnable that updates the display.
      */
     @Nullable
-    protected BukkitRunnable displayRunnable;
+    protected TaskHandle displayRunnable;
 
     /**
      * The display used to show the conversation.
@@ -156,18 +156,13 @@ public class MenuConvIO extends ChatConvIO {
 
         updateDisplay();
         if (settings.refreshDelay() > 0) {
-            displayRunnable = new BukkitRunnable() {
+            displayRunnable = Scheduling.runAsyncTimer(plugin, task -> {
+                updateDisplay();
 
-                @Override
-                public void run() {
-                    updateDisplay();
-
-                    if (state.isEnded()) {
-                        this.cancel();
-                    }
+                if (state.isEnded()) {
+                    task.cancel();
                 }
-            };
-            displayRunnable.runTaskTimerAsynchronously(plugin, settings.refreshDelay(), settings.refreshDelay());
+            }, settings.refreshDelay(), settings.refreshDelay());
         }
     }
 
@@ -328,7 +323,7 @@ public class MenuConvIO extends ChatConvIO {
             return true;
         }
         selectionCooldowns.add(player);
-        Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, () -> selectionCooldowns.remove(player), settings.rateLimit());
+        Scheduling.runAsyncLater(plugin, () -> selectionCooldowns.remove(player), settings.rateLimit());
         return false;
     }
 
@@ -487,14 +482,14 @@ public class MenuConvIO extends ChatConvIO {
         @Override
         public void forward() {
             if (controls.containsKey(CONTROL.MOVE)) {
-                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> updateDisplay(Scroll.UP));
+                Scheduling.runAsync(plugin, () -> updateDisplay(Scroll.UP));
             }
         }
 
         @Override
         public void back() {
             if (controls.containsKey(CONTROL.MOVE)) {
-                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> updateDisplay(Scroll.DOWN));
+                Scheduling.runAsync(plugin, () -> updateDisplay(Scroll.DOWN));
             }
         }
 

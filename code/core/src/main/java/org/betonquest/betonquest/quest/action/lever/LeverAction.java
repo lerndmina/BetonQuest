@@ -1,9 +1,11 @@
 package org.betonquest.betonquest.quest.action.lever;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -41,6 +43,10 @@ public class LeverAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), location.getValue(profile), () -> executeInRegion(profile));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
         final Block block = location.getValue(profile).getBlock();
 
         if (block.getType() != Material.LEVER) {

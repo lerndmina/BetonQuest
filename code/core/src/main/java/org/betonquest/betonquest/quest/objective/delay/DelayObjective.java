@@ -13,18 +13,17 @@ import org.betonquest.betonquest.api.instruction.argument.parser.NumberParser;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveProperties;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map.Entry;
 
 /**
  * Player has to wait specified amount of time. He may logout, the objective
@@ -50,7 +49,7 @@ public class DelayObjective extends DefaultObjective {
     /**
      * The runnable task that checks the delay.
      */
-    private final BukkitTask runnable;
+    private final TaskHandle runnable;
 
     /**
      * Constructor for the DelayObjective.
@@ -68,25 +67,18 @@ public class DelayObjective extends DefaultObjective {
         this.delay = delay;
         this.ticks = ticks;
         this.seconds = seconds;
-        this.runnable = new BukkitRunnable() {
-            @Override
-            public void run() {
-                final List<Profile> players = new LinkedList<>();
-                final long time = System.currentTimeMillis();
-                for (final Entry<Profile, String> entry : service.getData().entrySet()) {
-                    final Profile profile = entry.getKey();
+        this.runnable = Scheduling.runGlobalTimer(BetonQuest.getInstance(), task -> {
+            final long time = System.currentTimeMillis();
+            // iterate a copy, completing the objective changes the data
+            for (final Profile profile : List.copyOf(service.getData().keySet())) {
+                ProfileThreads.execute(BetonQuest.getInstance(), profile, () -> {
                     final boolean profileConditions = getExceptionHandler().handle(() -> service.checkConditions(profile), false);
                     if (profileConditions && time >= getTargetTimestamp(profile)) {
-                        // don't complete the objective, it will throw CME/
-                        // store the player instead, complete later
-                        players.add(profile);
+                        service.complete(profile);
                     }
-                }
-                for (final Profile profile : players) {
-                    service.complete(profile);
-                }
+                });
             }
-        }.runTaskTimer(BetonQuest.getInstance(), 0, interval.getValue(null).longValue());
+        }, 1, interval.getValue(null).longValue());
         service.setDefaultData(this::getDefaultDataInstruction);
         final ObjectiveProperties properties = service.getProperties();
         properties.setProperty("left", profile ->

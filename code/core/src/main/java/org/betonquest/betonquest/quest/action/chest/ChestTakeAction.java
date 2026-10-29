@@ -1,5 +1,6 @@
 package org.betonquest.betonquest.quest.action.chest;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.identifier.ActionIdentifier;
 import org.betonquest.betonquest.api.instruction.Argument;
@@ -8,6 +9,7 @@ import org.betonquest.betonquest.api.instruction.type.ItemWrapper;
 import org.betonquest.betonquest.api.item.QuestItem;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.service.action.ActionManager;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -77,6 +79,10 @@ public class ChestTakeAction extends AbstractChestAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), getLocation(profile), () -> executeInRegion(profile));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
         try {
             final boolean abort = this.abort.getValue(profile).orElse(false);
             final Inventory inventory = getChest(profile).getInventory();

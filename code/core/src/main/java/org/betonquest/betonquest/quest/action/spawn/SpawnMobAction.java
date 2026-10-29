@@ -1,10 +1,12 @@
 package org.betonquest.betonquest.quest.action.spawn;
 
 import net.kyori.adventure.text.Component;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.util.EntityUtils;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
@@ -71,6 +73,10 @@ public class SpawnMobAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), this.location.getValue(profile), () -> executeInRegion(profile));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile) throws QuestException {
         final Location location = this.location.getValue(profile);
         final int numberOfMob = amount.getValue(profile).intValue();
         for (int i = 0; i < numberOfMob; i++) {

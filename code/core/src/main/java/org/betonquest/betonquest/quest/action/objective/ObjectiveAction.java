@@ -14,7 +14,7 @@ import org.betonquest.betonquest.data.PlayerDataStorage;
 import org.betonquest.betonquest.database.PlayerData;
 import org.betonquest.betonquest.database.Saver;
 import org.betonquest.betonquest.database.UpdateType;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 
@@ -137,7 +137,7 @@ public class ObjectiveAction implements NullableAction {
     }
 
     private void handleForOfflinePlayer(final Profile profile, final ObjectiveIdentifier objectiveID) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Scheduling.runAsync(plugin, () -> {
             final PlayerData playerData = playerDataStorage.get(profile);
             switch (action.toLowerCase(Locale.ROOT)) {
                 case "start", "add" -> playerData.addNewRawObjective(objectiveID);

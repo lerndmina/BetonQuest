@@ -7,6 +7,7 @@ import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
@@ -14,7 +15,6 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.potion.PotionEffect;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
@@ -104,13 +104,10 @@ public class DieObjective extends DefaultObjective {
             }
 
             final Optional<Location> targetLocation = getLocation(onlineProfile);
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    targetLocation.ifPresent(player::teleport);
-                    player.setFireTicks(0);
-                }
-            }.runTaskLater(BetonQuest.getInstance(), 1);
+            Scheduling.runForEntityLater(BetonQuest.getInstance(), player, () -> {
+                targetLocation.ifPresent(target -> Scheduling.teleport(BetonQuest.getInstance(), player, target));
+                player.setFireTicks(0);
+            }, 1);
             getService().complete(onlineProfile);
         }
     }

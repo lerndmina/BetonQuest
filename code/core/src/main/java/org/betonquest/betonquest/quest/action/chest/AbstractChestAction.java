@@ -29,6 +29,17 @@ public abstract class AbstractChestAction implements NullableAction {
     }
 
     /**
+     * Resolves the location of the chest.
+     *
+     * @param profile the profile to resolve the location for
+     * @return the location
+     * @throws QuestException if the location cannot be resolved
+     */
+    protected Location getLocation(@Nullable final Profile profile) throws QuestException {
+        return location.getValue(profile);
+    }
+
+    /**
      * Returns the chest at the specified location.
      *
      * @param profile the profile of the player

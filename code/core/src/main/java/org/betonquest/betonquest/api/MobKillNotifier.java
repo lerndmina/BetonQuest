@@ -3,10 +3,10 @@ package org.betonquest.betonquest.api;
 import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.bukkit.event.ProfileEvent;
 import org.betonquest.betonquest.api.profile.Profile;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.event.HandlerList;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -37,13 +37,14 @@ public final class MobKillNotifier {
     private final List<UUID> entities = new ArrayList<>();
 
     private MobKillNotifier() {
-        final BukkitRunnable cleaner = new BukkitRunnable() {
-            @Override
-            public void run() {
-                entities.clear();
-            }
-        };
-        cleaner.runTaskTimer(BetonQuest.getInstance(), 1, 1);
+        Scheduling.runGlobalTimer(BetonQuest.getInstance(), task -> clear(), 1, 1);
+    }
+
+    @SuppressWarnings("PMD.AvoidSynchronizedStatement")
+    private void clear() {
+        synchronized (MobKillNotifier.class) {
+            entities.clear();
+        }
     }
 
     /**

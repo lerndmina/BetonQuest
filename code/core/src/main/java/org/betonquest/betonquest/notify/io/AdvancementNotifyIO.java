@@ -12,13 +12,13 @@ import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.service.placeholder.PlaceholderManager;
 import org.betonquest.betonquest.lib.version.MinecraftVersion;
 import org.betonquest.betonquest.notify.NotifyIO;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
@@ -70,15 +70,13 @@ public class AdvancementNotifyIO extends NotifyIO {
         final NamespacedKey key = new NamespacedKey("betonquest", "notify/" + uuid + "-message");
         loadAdvancementSync(message, rootKey, key);
 
-        Bukkit.getScheduler().runTask(plugin, run -> grant(key, onlineProfile.getPlayer()));
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                revoke(key, onlineProfile.getPlayer());
-                remove(key);
-                remove(rootKey);
-            }
-        }.runTaskLater(plugin, 10);
+        final Player player = onlineProfile.getPlayer();
+        Scheduling.runForEntity(plugin, player, () -> grant(key, player));
+        Scheduling.runForEntityLater(plugin, player, () -> {
+            revoke(key, player);
+            remove(key);
+            remove(rootKey);
+        }, 10);
     }
 
     @Override
@@ -103,7 +101,7 @@ public class AdvancementNotifyIO extends NotifyIO {
             loadAdvancement(message, rootKey, key);
             return;
         }
-        final Future<QuestException> future = plugin.getServer().getScheduler().callSyncMethod(plugin, () -> {
+        final Future<QuestException> future = Scheduling.supplyGlobal(plugin, () -> {
             try {
                 loadAdvancement(message, rootKey, key);
                 return null;
@@ -123,12 +121,7 @@ public class AdvancementNotifyIO extends NotifyIO {
 
     @SuppressWarnings("deprecation")
     private void remove(final NamespacedKey key) {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Bukkit.getUnsafe().removeAdvancement(key);
-            }
-        }.runTask(plugin);
+        Scheduling.runGlobal(plugin, () -> Bukkit.getUnsafe().removeAdvancement(key));
     }
 
     private void grant(final NamespacedKey key, final Player player) {

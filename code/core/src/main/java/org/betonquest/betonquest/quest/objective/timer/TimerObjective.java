@@ -10,8 +10,9 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.objective.ObjectiveState;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.api.service.action.ActionManager;
-import org.bukkit.Bukkit;
-import org.bukkit.scheduler.BukkitTask;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 
 import java.util.List;
 
@@ -38,7 +39,7 @@ public class TimerObjective extends CountingObjective implements Runnable {
     /**
      * The scheduled task that runs the objective.
      */
-    private final BukkitTask runnable;
+    private final TaskHandle runnable;
 
     /**
      * Constructs a new TrackingObjective.
@@ -57,7 +58,7 @@ public class TimerObjective extends CountingObjective implements Runnable {
         this.doneActions = doneActions;
         this.actionManager = actionManager;
         this.interval = interval.getValue(null).intValue();
-        this.runnable = Bukkit.getScheduler().runTaskTimer(BetonQuest.getInstance(), this, this.interval * 20L, this.interval * 20L);
+        this.runnable = Scheduling.runGlobalTimer(BetonQuest.getInstance(), task -> run(), this.interval * 20L, this.interval * 20L);
         service.getProperties().setProperty("name", name::getValue);
     }
 
@@ -69,14 +70,14 @@ public class TimerObjective extends CountingObjective implements Runnable {
 
     @Override
     public void run() {
-        getService().getData().keySet().forEach(profile -> {
-            getExceptionHandler().handle(() -> {
+        for (final Profile profile : List.copyOf(getService().getData().keySet())) {
+            ProfileThreads.execute(BetonQuest.getInstance(), profile, () -> getExceptionHandler().handle(() -> {
                 if (getService().checkConditions(profile)) {
                     getCountingData(profile).progress(interval);
                     completeIfDoneOrNotify(profile);
                 }
-            });
-        });
+            }));
+        }
     }
 
     /**

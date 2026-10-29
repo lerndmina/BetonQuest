@@ -1,5 +1,6 @@
 package org.betonquest.betonquest.compatibility.holograms;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.config.quest.QuestPackage;
 import org.betonquest.betonquest.api.identifier.ConditionIdentifier;
 import org.betonquest.betonquest.api.instruction.Argument;
@@ -9,6 +10,7 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.compatibility.holograms.lines.AbstractLine;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.bukkit.Location;
 import org.jetbrains.annotations.Nullable;
 
@@ -55,9 +57,7 @@ public record HologramWrapper(QuestExceptionHandler handler, ConditionManager co
             }
             return;
         }
-        for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
-            updateVisibilityForPlayer(onlineProfile);
-        }
+        ProfileThreads.forEach(BetonQuest.getInstance(), profileProvider.getOnlineProfiles(), this::updateVisibilityForPlayer);
     }
 
     /**

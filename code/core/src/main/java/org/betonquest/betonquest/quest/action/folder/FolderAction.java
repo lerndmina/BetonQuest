@@ -11,13 +11,14 @@ import org.betonquest.betonquest.api.quest.action.NullableAction;
 import org.betonquest.betonquest.api.service.action.ActionManager;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.lib.argument.type.TimeUnit;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Consumer;
 
 /**
  * The folder action is a collection of other actions that can be run after a delay and with a periode between the action.
@@ -184,32 +186,26 @@ public class FolderAction implements NullableAction {
         }
         if (!chosenList.isEmpty()) {
             final FolderActionCanceler actionCanceler = createFolderActionCanceler(profile);
-            callSameSyncAsyncContext(new BukkitRunnable() {
-                @Override
-                public void run() {
-                    final ActionIdentifier action = chosenList.pollFirst();
-                    if (actionCanceler.isCancelled() || action == null || checkCancelConditions(profile)) {
-                        actionCanceler.destroy();
-                        this.cancel();
-                        return;
-                    }
-                    actionManager.run(profile, action);
+            callSameSyncAsyncContext(profile, task -> {
+                final ActionIdentifier action = chosenList.pollFirst();
+                if (actionCanceler.isCancelled() || action == null || checkCancelConditions(profile)) {
+                    actionCanceler.destroy();
+                    task.cancel();
+                    return;
                 }
+                actionManager.run(profile, action);
             }, delayTicks == 0 ? periodTicks : delayTicks, periodTicks);
         }
     }
 
     private void handleDelayNoPeriod(@Nullable final Profile profile, final Deque<ActionIdentifier> chosenList, final long delayTicks) throws QuestException {
         final FolderActionCanceler actionCanceler = createFolderActionCanceler(profile);
-        callSameSyncAsyncContext(new BukkitRunnable() {
-            @Override
-            public void run() {
-                actionCanceler.destroy();
-                if (actionCanceler.isCancelled()) {
-                    return;
-                }
-                executeAllActions(profile, chosenList);
+        callSameSyncAsyncContext(profile, task -> {
+            actionCanceler.destroy();
+            if (actionCanceler.isCancelled()) {
+                return;
             }
+            executeAllActions(profile, chosenList);
         }, delayTicks, -1);
     }
 
@@ -236,18 +232,32 @@ public class FolderAction implements NullableAction {
         return () -> false;
     }
 
-    private void callSameSyncAsyncContext(final BukkitRunnable runnable, final long delay, final long period) {
-        if (Bukkit.getServer().isPrimaryThread()) {
+    /**
+     * Schedules the task in the same context the folder was fired in.
+     * <p>
+     * From a server thread the task runs on the thread owning the profile's player, or on the global region when
+     * there is no online player, so the delayed actions still run after the player left. From an async thread the
+     * task runs async again.
+     *
+     * @param profile the profile the folder runs for
+     * @param task    the task, getting the timer to cancel
+     * @param delay   the delay in ticks
+     * @param period  the period in ticks, -1 to run once
+     */
+    private void callSameSyncAsyncContext(@Nullable final Profile profile, final Consumer<TaskHandle> task,
+                                          final long delay, final long period) {
+        if (ProfileThreads.isServerThread()) {
+            final Consumer<TaskHandle> onOwningThread = timer -> ProfileThreads.execute(plugin, profile, () -> task.accept(timer));
             if (period == -1) {
-                runnable.runTaskLater(plugin, delay);
+                Scheduling.runGlobalLater(plugin, onOwningThread, delay);
             } else {
-                runnable.runTaskTimer(plugin, delay, period);
+                Scheduling.runGlobalTimer(plugin, onOwningThread, delay, period);
             }
         } else {
             if (period == -1) {
-                runnable.runTaskLaterAsynchronously(plugin, delay);
+                Scheduling.runAsyncLater(plugin, task, delay);
             } else {
-                runnable.runTaskTimerAsynchronously(plugin, delay, period);
+                Scheduling.runAsyncTimer(plugin, task, delay, period);
             }
         }
     }
