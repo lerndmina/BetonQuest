@@ -1,14 +1,15 @@
 package org.betonquest.betonquest.quest.condition.block;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
 import org.betonquest.betonquest.api.instruction.type.BlockSelector;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.condition.NullableCondition;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.util.DefaultBlockSelector;
 import org.bukkit.Location;
-import org.bukkit.block.Block;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -46,13 +47,19 @@ public class BlockCondition implements NullableCondition {
 
     @Override
     public boolean check(@Nullable final Profile profile) throws QuestException {
-        final Block block = loc.getValue(profile).getBlock();
+        final Location location = loc.getValue(profile);
         final BlockSelector blockSelector = selector.getValue(profile);
-        return blockSelector.match(block, exactMatch.getValue(profile).orElse(false));
+        final boolean exact = exactMatch.getValue(profile).orElse(false);
+        return Scheduling.callAtLocation(BetonQuest.getInstance(), location, () -> blockSelector.match(location.getBlock(), exact));
     }
 
+    /**
+     * Reads the world on its own: on the thread owning the location, waiting for it from an async thread.
+     *
+     * @return false, the condition does not need to start on the thread owning the profile
+     */
     @Override
     public boolean isPrimaryThreadEnforced() {
-        return true;
+        return false;
     }
 }

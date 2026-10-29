@@ -9,12 +9,19 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 /**
  * Finds and uses the server thread responsible for a profile.
@@ -167,6 +174,49 @@ public final class ProfileThreads {
         for (final OnlineProfile profile : profiles) {
             Scheduling.executeForEntity(plugin, profile.getPlayer(), () -> task.accept(profile));
         }
+    }
+
+    /**
+     * Computes a value for each profile on the thread responsible for it and collects the results.
+     * <p>
+     * Values for profiles owned by the current thread are computed directly, so on Paper the returned future is
+     * already complete when this is called from the main thread. On Folia it completes on the thread that computed
+     * the last value. A computation that throws, or returns null, is logged and left out of the result.
+     * The result keeps the order of the given profiles.
+     *
+     * @param plugin   the owning plugin
+     * @param profiles the profiles
+     * @param task     the computation per profile
+     * @param <P>      the profile type
+     * @param <T>      the result type
+     * @return a future completing with the results per profile
+     */
+    public static <P extends Profile, T> CompletableFuture<Map<P, T>> supplyEach(final Plugin plugin, final Collection<? extends P> profiles,
+                                                                                 final Function<? super P, ? extends T> task) {
+        final List<P> order = new ArrayList<>(profiles);
+        final Map<P, T> results = new ConcurrentHashMap<>();
+        final CompletableFuture<?>[] futures = new CompletableFuture<?>[order.size()];
+        for (int i = 0; i < order.size(); i++) {
+            final P profile = order.get(i);
+            futures[i] = supply(plugin, profile, () -> task.apply(profile)).handle((value, error) -> {
+                if (error != null) {
+                    plugin.getLogger().log(Level.WARNING, "Could not compute a value for " + profile + ": " + error.getMessage(), error);
+                } else if (value != null) {
+                    results.put(profile, value);
+                }
+                return null;
+            });
+        }
+        return CompletableFuture.allOf(futures).thenApply(ignored -> {
+            final Map<P, T> ordered = new LinkedHashMap<>();
+            for (final P profile : order) {
+                final T value = results.get(profile);
+                if (value != null) {
+                    ordered.put(profile, value);
+                }
+            }
+            return ordered;
+        });
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")

@@ -1,10 +1,12 @@
 package org.betonquest.betonquest.quest.condition.entity;
 
 import net.kyori.adventure.text.Component;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.condition.NullableCondition;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.util.EntityUtils;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -70,9 +72,10 @@ public class EntityCondition implements NullableCondition {
         final double resolvedRange = range.getValue(profile).doubleValue();
         final Component name = this.name == null ? null : this.name.getValue(profile);
         final String resolvedMarked = marked == null ? null : marked.getValue(profile);
-        final List<Entity> selectedEntity = EntityUtils.getSelectedEntity(location, name, resolvedMarked, resolvedRange);
+        final List<EntityType> selectedTypes = Scheduling.callAtLocation(BetonQuest.getInstance(), location,
+                () -> EntityUtils.getSelectedEntity(location, name, resolvedMarked, resolvedRange).stream().map(Entity::getType).toList());
         for (final Map.Entry<EntityType, Integer> entry : entityAmounts.getValue(profile)) {
-            final long count = selectedEntity.stream().filter(entity -> entity.getType() == entry.getKey()).count();
+            final long count = selectedTypes.stream().filter(type -> type == entry.getKey()).count();
             if (count < entry.getValue()) {
                 return false;
             }
@@ -80,8 +83,13 @@ public class EntityCondition implements NullableCondition {
         return true;
     }
 
+    /**
+     * Reads the world on its own: on the thread owning the location, waiting for it from an async thread.
+     *
+     * @return false, the condition does not need to start on the thread owning the profile
+     */
     @Override
     public boolean isPrimaryThreadEnforced() {
-        return true;
+        return false;
     }
 }

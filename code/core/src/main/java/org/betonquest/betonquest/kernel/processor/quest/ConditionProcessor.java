@@ -147,12 +147,29 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
         }
     }
 
+    /**
+     * Checks the condition on the current thread.
+     * <p>
+     * Callers on a server thread are expected to call this for profiles that thread owns. A server thread can not
+     * wait for another one, so a check for a player owned by another region (Folia only) still runs here. If the
+     * condition then touches world state the server rejects that with an {@link IllegalStateException}; it is
+     * reported like a failed check instead of aborting the caller, for example a loop over all online players.
+     *
+     * @param profile     the profile to check for
+     * @param conditionID the condition id
+     * @param condition   the condition
+     * @return whether the condition is met
+     */
     private boolean checkOutcome(@Nullable final Profile profile, final ConditionIdentifier conditionID, final ConditionAdapter condition) {
         final boolean outcome;
         try {
             outcome = condition.check(profile);
         } catch (final QuestException e) {
             log.warn(conditionID.getPackage(), "Error while checking '" + conditionID + "' condition: " + e.getMessage(), e);
+            return false;
+        } catch (final IllegalStateException e) {
+            log.warn(conditionID.getPackage(), "Could not check '" + conditionID + "' condition for " + profile
+                    + " on thread '" + Thread.currentThread().getName() + "': " + e.getMessage(), e);
             return false;
         }
         final boolean isMet = outcome != conditionID.isInverted();

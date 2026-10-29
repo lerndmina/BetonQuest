@@ -3,6 +3,7 @@ package org.betonquest.betonquest.thread;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.common.function.QuestRunnable;
+import org.betonquest.betonquest.api.common.function.QuestSupplier;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Server;
@@ -14,6 +15,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -290,6 +292,22 @@ public final class Scheduling {
     }
 
     /**
+     * Runs a task now if the current thread owns the entity, otherwise on the owning thread on the next tick.
+     * If the entity is removed before that, the task runs on the global region.
+     *
+     * @param plugin the owning plugin
+     * @param entity the entity the task works on
+     * @param task   the task
+     */
+    public static void executeForEntityOrGlobal(final Plugin plugin, final Entity entity, final Runnable task) {
+        if (Bukkit.isOwnedByCurrentRegion(entity)) {
+            task.run();
+        } else {
+            runForEntityOrGlobal(plugin, entity, task);
+        }
+    }
+
+    /**
      * Runs a task on the thread owning the location on the next tick.
      *
      * @param plugin   the owning plugin
@@ -331,6 +349,66 @@ public final class Scheduling {
             return;
         }
         runAtLocation(plugin, location, () -> runLogged(plugin, task));
+    }
+
+    /**
+     * Computes quest logic on the thread owning the location and returns the result.
+     * <p>
+     * Runs directly if the current thread owns the location. An async thread waits for the owning thread.
+     * A server thread that does not own the location (another region on Folia, never the case on Paper) must not
+     * wait for another region, so the read fails with a {@link QuestException} instead.
+     *
+     * @param plugin   the owning plugin
+     * @param location the location the task reads
+     * @param task     the task
+     * @param <T>      the result type
+     * @return the result
+     * @throws QuestException if the task fails, or the location cannot be read from the current thread
+     */
+    @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.PreserveStackTrace"})
+    public static <T> T callAtLocation(final Plugin plugin, final Location location, final QuestSupplier<T> task) throws QuestException {
+        if (Bukkit.isOwnedByCurrentRegion(location)) {
+            return task.get();
+        }
+        if (Bukkit.isPrimaryThread()) {
+            throw new QuestException("Cannot read the world at " + location.getBlockX() + ";" + location.getBlockY() + ";"
+                    + location.getBlockZ() + ";" + (location.getWorld() == null ? "null" : location.getWorld().getName())
+                    + " from a region thread that does not own it");
+        }
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        Bukkit.getRegionScheduler().execute(plugin, location, () -> {
+            try {
+                future.complete(task.get());
+            } catch (final QuestException | RuntimeException e) {
+                future.completeExceptionally(e);
+            }
+        });
+        try {
+            return future.get();
+        } catch (final ExecutionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof final QuestException questException) {
+                throw new QuestException(questException.getMessage(), questException);
+            }
+            throw new QuestException("Failed to read the world on the region thread: " + cause.getMessage(), e);
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new QuestException("Interrupted while waiting for the region thread", e);
+        }
+    }
+
+    /**
+     * Runs a task now if the current thread is the global region thread, otherwise there on the next tick.
+     *
+     * @param plugin the owning plugin
+     * @param task   the task
+     */
+    public static void executeGlobal(final Plugin plugin, final Runnable task) {
+        if (isGlobalTickThread()) {
+            task.run();
+        } else {
+            runGlobal(plugin, task);
+        }
     }
 
     /**
