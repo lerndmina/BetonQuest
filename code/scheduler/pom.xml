@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.betonquest</groupId>
+    <artifactId>parent</artifactId>
+    <version>2.13.0</version>
+  </parent>
+
+  <name>BetonQuest Scheduler</name>
+  <groupId>org.betonquest.betonquest</groupId>
+  <artifactId>scheduler</artifactId>
+  <version>${revision}${changelist}</version>
+  <description>Region-aware task scheduling for Paper and Folia, built against the Paper scheduler API</description>
+
+  <properties>
+    <revision>3.3.0</revision>
+    <changelist>-SNAPSHOT</changelist>
+    <pit.report.skip>true</pit.report.skip>
+
+    <!-- module versions -->
+    <betonquest.api.version>3.2.0${changelist}</betonquest.api.version>
+
+    <!-- dependency versions -->
+    <paper-api.version>1.20.6-R0.1-SNAPSHOT</paper-api.version>
+  </properties>
+
+  <dependencies>
+    <!-- from betonquest module -->
+    <dependency>
+      <groupId>org.betonquest.betonquest</groupId>
+      <artifactId>api</artifactId>
+      <version>${betonquest.api.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- from papermc repository -->
+    <dependency>
+      <groupId>io.papermc.paper</groupId>
+      <artifactId>paper-api</artifactId>
+      <version>${paper-api.version}</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+  </dependencies>
+
+  <repositories>
+    <repository>
+      <id>betonquest-repo</id>
+      <url>https://repo.betonquest.org/betonquest/</url>
+    </repository>
+    <repository>
+      <id>betonquest-papermc-repo</id>
+      <url>https://repo.papermc.io/repository/maven-public/</url>
+    </repository>
+  </repositories>
+</project>
