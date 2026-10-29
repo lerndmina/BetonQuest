@@ -10,6 +10,7 @@ import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.quest.npc.Npc;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.api.service.npc.NpcManager;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.Bukkit;
@@ -22,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -67,8 +69,15 @@ public class EffectLibRunnable implements Runnable {
 
     /**
      * All player profiles that meet the conditions for this classes' effect.
+     * Replaced as a whole once the conditions of all players were checked, each on the thread owning the player.
      */
-    private List<OnlineProfile> activeProfiles;
+    private volatile List<OnlineProfile> activeProfiles;
+
+    /**
+     * The plugin running this effect, null until started.
+     */
+    @Nullable
+    private Plugin plugin;
 
     /**
      * The last game tick the conditions were checked on.
@@ -113,6 +122,7 @@ public class EffectLibRunnable implements Runnable {
      * @param interval the interval in ticks
      */
     public void start(final Plugin plugin, final long delay, final long interval) {
+        this.plugin = plugin;
         task = Scheduling.runGlobalTimer(plugin, scheduled -> run(), delay, interval);
     }
 
@@ -129,25 +139,43 @@ public class EffectLibRunnable implements Runnable {
     @Override
     public void run() {
         if (Bukkit.getCurrentTick() - lastConditionCheckTick >= conditionCheckInterval) {
-            activeProfiles = checkActiveEffects();
+            checkActiveEffects();
             lastConditionCheckTick = Bukkit.getCurrentTick();
         }
         activateEffects(activeProfiles);
     }
 
-    private List<OnlineProfile> checkActiveEffects() {
-        final List<OnlineProfile> activePlayerEffects = new ArrayList<>();
-        for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
-            try {
-                if (conditionManager.testAll(onlineProfile, effectConfiguration.conditions().getValue(onlineProfile))) {
+    /**
+     * Checks the conditions of every online player on the thread owning that player and replaces the active
+     * profiles once all were checked. On Paper this completes directly on the main thread.
+     */
+    private void checkActiveEffects() {
+        final Plugin owner = plugin;
+        if (owner == null) {
+            final List<OnlineProfile> activePlayerEffects = new ArrayList<>();
+            for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
+                if (meetsConditions(onlineProfile)) {
                     activePlayerEffects.add(onlineProfile);
                 }
-            } catch (final QuestException e) {
-                log.warn("Could not check conditions for effectlib effect '%s' for profile '%s': %s".formatted(
-                        effectConfiguration.settings().getName(), onlineProfile, e.getMessage()), e);
             }
+            activeProfiles = activePlayerEffects;
+            return;
         }
-        return activePlayerEffects;
+        ProfileThreads.supplyEach(owner, profileProvider.getOnlineProfiles(), this::meetsConditions)
+                .thenAccept(results -> activeProfiles = results.entrySet().stream()
+                        .filter(Map.Entry::getValue)
+                        .map(Map.Entry::getKey)
+                        .toList());
+    }
+
+    private boolean meetsConditions(final OnlineProfile onlineProfile) {
+        try {
+            return conditionManager.testAll(onlineProfile, effectConfiguration.conditions().getValue(onlineProfile));
+        } catch (final QuestException e) {
+            log.warn("Could not check conditions for effectlib effect '%s' for profile '%s': %s".formatted(
+                    effectConfiguration.settings().getName(), onlineProfile, e.getMessage()), e);
+            return false;
+        }
     }
 
     private void activateEffects(final List<OnlineProfile> activePlayers) {

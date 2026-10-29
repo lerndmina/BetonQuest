@@ -128,17 +128,18 @@ public class TrainCartsRideObjective extends CountingObjective {
 
     private void startCount(final OnlineProfile onlineProfile) throws QuestException {
         final int ticksToCompletion = getCountingData(onlineProfile).getAmountLeft() * 20;
-        final TaskHandle bukkitTask = Scheduling.runGlobalLater(plugin,
-                () -> stopCount(onlineProfile), ticksToCompletion);
+        final Runnable stop = () -> stopCount(onlineProfile);
+        final TaskHandle playerTask = Scheduling.runForEntityLater(plugin, onlineProfile.getPlayer(), stop, ticksToCompletion);
+        final TaskHandle bukkitTask = playerTask == null ? Scheduling.runGlobalLater(plugin, stop, ticksToCompletion) : playerTask;
 
         startTimes.put(onlineProfile, Pair.of(System.currentTimeMillis(), bukkitTask));
     }
 
     private void stopCount(final OnlineProfile onlineProfile) {
-        if (!startTimes.containsKey(onlineProfile)) {
+        final Pair<Long, TaskHandle> remove = startTimes.remove(onlineProfile);
+        if (remove == null) {
             return;
         }
-        final Pair<Long, TaskHandle> remove = startTimes.remove(onlineProfile);
         remove.getValue().cancel();
         getExceptionHandler().handle(() -> {
             if (!getService().checkConditions(onlineProfile)) {

@@ -1,5 +1,6 @@
 package org.betonquest.betonquest.quest.action.party;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.identifier.ActionIdentifier;
 import org.betonquest.betonquest.api.identifier.ConditionIdentifier;
@@ -9,9 +10,11 @@ import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.quest.action.OnlineAction;
 import org.betonquest.betonquest.api.service.action.ActionManager;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.betonquest.betonquest.util.Utils;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,18 +86,36 @@ public class PartyAction implements OnlineAction {
         this.actions = actions;
     }
 
+    /**
+     * Checks the conditions of each party member on the thread owning that member, then runs the actions for the
+     * members meeting them. On Paper that all happens directly on the main thread.
+     *
+     * @param profile the profile the party is formed around
+     * @throws QuestException if an argument could not be resolved
+     */
     @Override
     public void execute(final OnlineProfile profile) throws QuestException {
-        for (final OnlineProfile member : getMemberList(profile)) {
-            actionManager.run(member, actions.getValue(profile));
-        }
+        final int toExecute = amount != null ? amount.getValue(profile).intValue() : -1;
+        final List<ConditionIdentifier> resolvedConditions = conditions.getValue(profile);
+        final List<ActionIdentifier> resolvedActions = actions.getValue(profile);
+        final Map<OnlineProfile, Double> candidates = Utils.getPartyCandidates(profileProvider.getOnlineProfiles(),
+                profile.getPlayer().getLocation(), range.getValue(profile).doubleValue());
+        ProfileThreads.supplyEach(BetonQuest.getInstance(), candidates.keySet(),
+                        member -> conditionManager.testAll(member, resolvedConditions))
+                .thenAccept(results -> {
+                    final Map<OnlineProfile, Double> members = new HashMap<>();
+                    candidates.forEach((member, distance) -> {
+                        if (Boolean.TRUE.equals(results.get(member))) {
+                            members.put(member, distance);
+                        }
+                    });
+                    for (final OnlineProfile member : getMemberList(members, toExecute)) {
+                        actionManager.run(member, resolvedActions);
+                    }
+                });
     }
 
-    private Set<OnlineProfile> getMemberList(final OnlineProfile profile) throws QuestException {
-        final int toExecute = amount != null ? amount.getValue(profile).intValue() : -1;
-        final Map<OnlineProfile, Double> members = Utils.getParty(conditionManager, profileProvider.getOnlineProfiles(),
-                profile.getPlayer().getLocation(), range.getValue(profile).doubleValue(), conditions.getValue(profile));
-
+    private Set<OnlineProfile> getMemberList(final Map<OnlineProfile, Double> members, final int toExecute) {
         if (toExecute < 0) {
             return members.keySet();
         }
