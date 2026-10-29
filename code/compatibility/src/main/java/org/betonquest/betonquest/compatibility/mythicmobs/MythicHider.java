@@ -4,7 +4,6 @@ import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 import io.lumine.mythic.bukkit.events.MythicMobDespawnEvent;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
-import org.betonquest.betonquest.thread.ProfileThreads;
 import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.entity.Entity;
@@ -15,6 +14,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -22,6 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Hides MythicMobs from the spawn event and NPCs.
+ * <p>
+ * Hiding or showing an entity reads the entity and changes its tracker, so on Folia it runs on the thread owning
+ * the mob, not the player. The player's visibility map is thread-safe there. On Paper it all runs on the main thread.
  */
 public final class MythicHider implements Listener {
 
@@ -69,11 +72,16 @@ public final class MythicHider implements Listener {
         if (updateInterval <= 0) {
             return;
         }
-        loop = Scheduling.runGlobalTimer(plugin, task -> ProfileThreads.forEach(plugin, profileProvider.getOnlineProfiles(), onlineProfile -> {
+        loop = Scheduling.runGlobalTimer(plugin, task -> {
+            final List<OnlineProfile> onlineProfiles = profileProvider.getOnlineProfiles();
             for (final Entity mob : mythicmobs.keySet()) {
-                applyVisibility(onlineProfile, mob);
+                onMobThread(mob, () -> {
+                    for (final OnlineProfile onlineProfile : onlineProfiles) {
+                        applyVisibilityOnMobThread(onlineProfile, mob);
+                    }
+                });
             }
-        }), 1, updateInterval);
+        }, 1, updateInterval);
     }
 
     /**
@@ -94,7 +102,8 @@ public final class MythicHider implements Listener {
     public void applyVisibility(final OnlineProfile onlineProfile) {
         for (final Map.Entry<Entity, Set<UUID>> mythic : mythicmobs.entrySet()) {
             if (!mythic.getValue().contains(onlineProfile.getProfileUUID())) {
-                onlineProfile.getPlayer().hideEntity(plugin, mythic.getKey());
+                final Entity mob = mythic.getKey();
+                onMobThread(mob, () -> onlineProfile.getPlayer().hideEntity(plugin, mob));
             }
         }
     }
@@ -106,6 +115,10 @@ public final class MythicHider implements Listener {
      * @param mythicMob     the mob to update the visibility for
      */
     public void applyVisibility(final OnlineProfile onlineProfile, final Entity mythicMob) {
+        onMobThread(mythicMob, () -> applyVisibilityOnMobThread(onlineProfile, mythicMob));
+    }
+
+    private void applyVisibilityOnMobThread(final OnlineProfile onlineProfile, final Entity mythicMob) {
         final Set<UUID> uuids = mythicmobs.get(mythicMob);
         if (uuids != null && !uuids.contains(onlineProfile.getProfileUUID())) {
             onlineProfile.getPlayer().hideEntity(plugin, mythicMob);
@@ -122,10 +135,13 @@ public final class MythicHider implements Listener {
         final Set<UUID> profileUUIDS = ConcurrentHashMap.newKeySet();
         profileUUIDS.add(onlineProfile.getProfileUUID());
         mythicmobs.put(mythicMob, profileUUIDS);
-        // Hiding the mob for all players besides passed in online, each on the thread owning that player
-        ProfileThreads.forEach(plugin, profileProvider.getOnlineProfiles(), onlinePlayer -> {
-            if (!onlinePlayer.equals(onlineProfile)) {
-                applyVisibility(onlinePlayer, mythicMob);
+        // Hiding the mob for all players besides passed in online, on the thread owning the mob
+        final List<OnlineProfile> onlineProfiles = profileProvider.getOnlineProfiles();
+        onMobThread(mythicMob, () -> {
+            for (final OnlineProfile onlinePlayer : onlineProfiles) {
+                if (!onlinePlayer.equals(onlineProfile)) {
+                    applyVisibilityOnMobThread(onlinePlayer, mythicMob);
+                }
             }
         });
     }
@@ -141,7 +157,7 @@ public final class MythicHider implements Listener {
         if (uuids != null) {
             uuids.remove(onlineProfile.getPlayerUUID());
         }
-        onlineProfile.getPlayer().hideEntity(plugin, mythicMob);
+        onMobThread(mythicMob, () -> onlineProfile.getPlayer().hideEntity(plugin, mythicMob));
     }
 
     /**
@@ -155,7 +171,18 @@ public final class MythicHider implements Listener {
         if (uuids != null) {
             uuids.add(onlineProfile.getPlayerUUID());
         }
-        onlineProfile.getPlayer().showEntity(plugin, mythicMob);
+        onMobThread(mythicMob, () -> onlineProfile.getPlayer().showEntity(plugin, mythicMob));
+    }
+
+    /**
+     * Runs the task now if the current thread owns the mob, otherwise on the thread owning it.
+     * Nothing runs if the mob was removed in the meantime.
+     *
+     * @param mob  the mob the task works on
+     * @param task the task
+     */
+    private void onMobThread(final Entity mob, final Runnable task) {
+        Scheduling.executeForEntity(plugin, mob, task);
     }
 
     /**

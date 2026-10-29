@@ -262,15 +262,28 @@ public class CitizensMoveController implements Listener, Predicate<NPC> {
             final Location firstLocation = locationsIterator.next();
             stopNPCMoving(npc);
 
-            if (npc.isSpawned()) {
-                if (citizensWalkingListener.isMovementPaused(npc)) {
-                    citizensWalkingListener.setNewTargetLocation(npc, firstLocation);
-                } else {
-                    npc.getNavigator().setTarget(firstLocation);
-                }
+            final Entity entity = npc.isSpawned() ? npc.getEntity() : null;
+            if (entity == null) {
+                spawnAt(npc, firstLocation);
+            } else if (citizensWalkingListener.isMovementPaused(npc)) {
+                citizensWalkingListener.setNewTargetLocation(npc, firstLocation);
             } else {
-                npc.spawn(firstLocation, SpawnReason.PLUGIN);
+                Scheduling.executeForEntity(plugin, entity, () -> npc.getNavigator().setTarget(firstLocation));
             }
+        }
+
+        /**
+         * Spawns the NPC on the thread owning the location.
+         *
+         * @param npc      the NPC to spawn
+         * @param location the location to spawn at
+         */
+        private void spawnAt(final NPC npc, final Location location) {
+            Scheduling.executeAtLocation(plugin, location, () -> {
+                if (!npc.isSpawned()) {
+                    npc.spawn(location, SpawnReason.PLUGIN);
+                }
+            });
         }
 
         /**
@@ -304,7 +317,7 @@ public class CitizensMoveController implements Listener, Predicate<NPC> {
                 if (npc.isSpawned()) {
                     npc.getNavigator().setTarget(next);
                 } else {
-                    npc.spawn(next, SpawnReason.PLUGIN);
+                    spawnAt(npc, next);
                 }
                 return;
             }

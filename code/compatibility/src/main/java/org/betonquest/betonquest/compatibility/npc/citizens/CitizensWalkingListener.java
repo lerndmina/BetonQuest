@@ -104,7 +104,12 @@ public class CitizensWalkingListener implements Listener {
                     nav.setPaused(false);
                     nav.setTarget(pair.getValue());
                 } else {
-                    npc.spawn(pair.getValue(), SpawnReason.PLUGIN);
+                    final Location target = pair.getValue();
+                    Scheduling.executeAtLocation(plugin, target, () -> {
+                        if (!npc.isSpawned()) {
+                            npc.spawn(target, SpawnReason.PLUGIN);
+                        }
+                    });
                 }
             });
         }
