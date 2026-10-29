@@ -15,7 +15,6 @@ import org.betonquest.betonquest.kernel.processor.quest.ConditionProcessor;
 import org.betonquest.betonquest.kernel.registry.quest.ConditionTypeRegistry;
 import org.betonquest.betonquest.lib.dependency.component.AbstractCoreComponent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.Set;
 
@@ -33,8 +32,7 @@ public class ConditionsComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, BukkitScheduler.class,
-                QuestPackageManager.class, BetonQuestLoggerFactory.class,
+        return Set.of(Plugin.class, QuestPackageManager.class, BetonQuestLoggerFactory.class,
                 Identifiers.class, Instructions.class, ProcessorDataLoader.class);
     }
 
@@ -49,7 +47,6 @@ public class ConditionsComponent extends AbstractCoreComponent {
         final BetonQuestLoggerFactory loggerFactory = getDependency(BetonQuestLoggerFactory.class);
         final Identifiers identifiers = getDependency(Identifiers.class);
         final Instructions instructions = getDependency(Instructions.class);
-        final BukkitScheduler bukkitScheduler = getDependency(BukkitScheduler.class);
         final Plugin plugin = getDependency(Plugin.class);
         final ProcessorDataLoader processorDataLoader = getDependency(ProcessorDataLoader.class);
 
@@ -57,7 +54,7 @@ public class ConditionsComponent extends AbstractCoreComponent {
         identifiers.register(ConditionIdentifier.class, conditionIdentifierFactory);
         final ConditionTypeRegistry conditionTypeRegistry = new ConditionTypeRegistry(loggerFactory.create(ConditionTypeRegistry.class));
         final ConditionProcessor conditionProcessor = new ConditionProcessor(loggerFactory.create(ConditionProcessor.class),
-                conditionTypeRegistry, bukkitScheduler, conditionIdentifierFactory, plugin, instructions);
+                conditionTypeRegistry, conditionIdentifierFactory, plugin, instructions);
 
         dependencyProvider.take(ConditionIdentifierFactory.class, conditionIdentifierFactory);
         dependencyProvider.take(ConditionTypeRegistry.class, conditionTypeRegistry);

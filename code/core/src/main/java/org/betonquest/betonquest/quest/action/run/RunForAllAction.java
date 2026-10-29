@@ -1,5 +1,6 @@
 package org.betonquest.betonquest.quest.action.run;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.QuestListException;
 import org.betonquest.betonquest.api.identifier.ActionIdentifier;
@@ -9,9 +10,12 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.PlayerlessAction;
 import org.betonquest.betonquest.api.service.action.ActionManager;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 /**
  * Run given set of actions for all profiles supplied by {@link #profileCollectionSupplier} that meet the
@@ -65,19 +69,42 @@ public class RunForAllAction implements PlayerlessAction {
         this.conditions = conditions;
     }
 
+    /**
+     * Runs the actions for each profile meeting the conditions.
+     * <p>
+     * A server thread that does not own a profile's player (another region on Folia, never the case on Paper)
+     * hands that profile to the thread owning the player, where a failure is logged instead of collected.
+     *
+     * @throws QuestException if running the actions failed for any profile handled on this thread
+     */
     @Override
     public void execute() throws QuestException {
         final QuestListException questListException = new QuestListException("Could not run actions for all profiles:");
+        final Plugin plugin = BetonQuest.getInstance();
         for (final Profile profile : profileCollectionSupplier.get()) {
+            if (ProfileThreads.isServerThread() && !ProfileThreads.isOwnedByCurrentThread(profile)) {
+                ProfileThreads.execute(plugin, profile, () -> {
+                    try {
+                        runFor(profile);
+                    } catch (final QuestException e) {
+                        plugin.getLogger().log(Level.WARNING, "Could not run actions for " + profile + ": " + e.getMessage(), e);
+                    }
+                });
+                continue;
+            }
             try {
-                final List<ConditionIdentifier> resolvedConditions = conditions.getValue(profile);
-                if (resolvedConditions.isEmpty() || conditionManager.testAll(profile, resolvedConditions)) {
-                    actionManager.run(profile, actions.getValue(profile));
-                }
+                runFor(profile);
             } catch (final QuestException e) {
                 questListException.addException(profile.toString(), e);
             }
         }
         questListException.throwIfNotEmpty();
+    }
+
+    private void runFor(final Profile profile) throws QuestException {
+        final List<ConditionIdentifier> resolvedConditions = conditions.getValue(profile);
+        if (resolvedConditions.isEmpty() || conditionManager.testAll(profile, resolvedConditions)) {
+            actionManager.run(profile, actions.getValue(profile));
+        }
     }
 }

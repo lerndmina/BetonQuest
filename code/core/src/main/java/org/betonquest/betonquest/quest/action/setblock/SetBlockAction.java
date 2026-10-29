@@ -1,11 +1,13 @@
 package org.betonquest.betonquest.quest.action.setblock;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
 import org.betonquest.betonquest.api.instruction.type.BlockSelector;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,9 +46,13 @@ public class SetBlockAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        final Location location = this.location.getValue(profile);
+        final Location resolvedLocation = this.location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         final BlockSelector blockSelector = selector.getValue(profile);
-        blockSelector.setToBlock(location.getBlock(), !ignorePhysics.getValue(profile).orElse(false));
+        blockSelector.setToBlock(resolvedLocation.getBlock(), !ignorePhysics.getValue(profile).orElse(false));
     }
 
     @Override

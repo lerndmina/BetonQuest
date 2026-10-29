@@ -2,7 +2,7 @@ package org.betonquest.betonquest.compatibility.npc.fancynpcs;
 
 import de.oliver.fancynpcs.api.Npc;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -56,7 +56,7 @@ public class FancyAdapter implements org.betonquest.betonquest.api.quest.npc.Npc
 
     @Override
     public void show(final OnlineProfile onlineProfile) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Scheduling.runAsync(plugin, () -> {
             final Player player = onlineProfile.getPlayer();
             final Boolean isVisible = npc.getIsVisibleForPlayer().get(player.getUniqueId());
             if (isVisible == null || !isVisible) {
@@ -67,7 +67,7 @@ public class FancyAdapter implements org.betonquest.betonquest.api.quest.npc.Npc
 
     @Override
     public void hide(final OnlineProfile onlineProfile) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Scheduling.runAsync(plugin, () -> {
             final Player player = onlineProfile.getPlayer();
             final Boolean isVisible = npc.getIsVisibleForPlayer().get(player.getUniqueId());
             if (isVisible == null || isVisible) {

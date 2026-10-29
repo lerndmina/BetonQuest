@@ -14,6 +14,7 @@ import org.betonquest.betonquest.api.service.item.ItemManager;
 import org.betonquest.betonquest.conversation.Conversation;
 import org.betonquest.betonquest.conversation.ConversationColors;
 import org.betonquest.betonquest.conversation.InventoryConvIO;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.Plugin;
@@ -86,7 +87,7 @@ public class CitizensInventoryConvIO extends InventoryConvIO {
             }
 
             try {
-                final SkinTrait skinTrait = Bukkit.getScheduler().callSyncMethod(plugin, () -> npc.getOrAddTrait(SkinTrait.class)).get();
+                final SkinTrait skinTrait = Scheduling.supplyGlobal(plugin, () -> npc.getOrAddTrait(SkinTrait.class)).get();
                 final String texture = skinTrait.getTexture();
                 if (texture != null) {
 

@@ -1,5 +1,6 @@
 package org.betonquest.betonquest.quest.action.chest;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
@@ -7,6 +8,7 @@ import org.betonquest.betonquest.api.instruction.type.ItemWrapper;
 import org.betonquest.betonquest.api.item.QuestItem;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.InventoryHolder;
@@ -53,7 +55,12 @@ public class ChestGiveAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        final Block block = location.getValue(profile).getBlock();
+        final Location resolvedLocation = location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
+        final Block block = resolvedLocation.getBlock();
         final InventoryHolder chest;
         try {
             chest = (InventoryHolder) block.getState(false);

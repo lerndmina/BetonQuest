@@ -5,12 +5,12 @@ import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 /**
  * Requires the player to shoot a target with a bow.
@@ -64,15 +64,12 @@ public class ArrowShootObjective extends DefaultObjective {
         final double pRange = range.getValue(onlineProfile).doubleValue();
         // check if the arrow is in the right place in the next tick
         // wait one tick, let the arrow land completely
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                final Location arrowLocation = arrow.getLocation();
-                if (arrowLocation.getWorld().equals(location.getWorld())
-                        && arrowLocation.distanceSquared(location) < pRange * pRange) {
-                    getService().complete(onlineProfile);
-                }
+        Scheduling.runForEntity(plugin, arrow, () -> {
+            final Location arrowLocation = arrow.getLocation();
+            if (arrowLocation.getWorld().equals(location.getWorld())
+                    && arrowLocation.distanceSquared(location) < pRange * pRange) {
+                getService().complete(onlineProfile);
             }
-        }.runTask(plugin);
+        });
     }
 }

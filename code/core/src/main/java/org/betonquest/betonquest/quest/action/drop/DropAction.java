@@ -1,10 +1,12 @@
 package org.betonquest.betonquest.quest.action.drop;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.type.ItemWrapper;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -39,12 +41,16 @@ public class DropAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        final Location location = this.location.getValue(profile);
+        final Location resolvedLocation = this.location.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         for (final ItemWrapper itemDefinition : items.getValue(profile)) {
             final ItemStack item = itemDefinition.generate(profile);
             final int amount = itemDefinition.getAmount().getValue(profile).intValue();
 
-            dropAsStacks(location, item, amount);
+            dropAsStacks(resolvedLocation, item, amount);
         }
     }
 

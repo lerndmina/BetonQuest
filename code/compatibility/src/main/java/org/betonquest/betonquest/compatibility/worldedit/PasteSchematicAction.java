@@ -12,11 +12,13 @@ import com.sk89q.worldedit.function.operation.Operation;
 import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.session.ClipboardHolder;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,25 +66,38 @@ public class PasteSchematicAction implements NullableAction {
         this.file = file;
     }
 
+    /**
+     * Loads the schematic and pastes it on the thread owning the paste location.
+     * On Paper that is the main thread. On Folia the whole schematic must lie in the region owning that location.
+     *
+     * @param profile the profile to resolve the arguments for
+     * @throws QuestException if the schematic could not be loaded, or pasting directly failed
+     */
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        final Location location = loc.getValue(profile);
+        final double rot = rotation.getValue(profile).doubleValue();
+        final boolean ignoreAir = noAir.getValue(profile).orElse(false);
+        final ClipboardHolder clipboard;
         try {
-            final Location location = loc.getValue(profile);
-            final double rot = rotation.getValue(profile).doubleValue();
+            clipboard = new ClipboardHolder(getClipboard(profile));
+        } catch (final IOException e) {
+            throw new QuestException("Error while pasting a schematic: " + e.getMessage(), e);
+        }
+        final AffineTransform transform = new AffineTransform();
+        clipboard.setTransform(clipboard.getTransform().combine(transform.rotateY(rot)));
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), location, () -> paste(clipboard, location, ignoreAir));
+    }
 
-            final ClipboardHolder clipboard = new ClipboardHolder(getClipboard(profile));
-            final AffineTransform transform = new AffineTransform();
-            clipboard.setTransform(clipboard.getTransform().combine(transform.rotateY(rot)));
-
-            try (EditSession editSession = WorldEdit.getInstance().newEditSessionBuilder().maxBlocks(-1).world(BukkitAdapter.adapt(location.getWorld())).build()) {
-                final Operation operation = clipboard
-                        .createPaste(editSession)
-                        .to(BukkitAdapter.asBlockVector(location))
-                        .ignoreAirBlocks(noAir.getValue(profile).orElse(false))
-                        .build();
-                Operations.complete(operation);
-            }
-        } catch (final IOException | WorldEditException e) {
+    private void paste(final ClipboardHolder clipboard, final Location location, final boolean ignoreAir) throws QuestException {
+        try (EditSession editSession = WorldEdit.getInstance().newEditSessionBuilder().maxBlocks(-1).world(BukkitAdapter.adapt(location.getWorld())).build()) {
+            final Operation operation = clipboard
+                    .createPaste(editSession)
+                    .to(BukkitAdapter.asBlockVector(location))
+                    .ignoreAirBlocks(ignoreAir)
+                    .build();
+            Operations.complete(operation);
+        } catch (final WorldEditException e) {
             throw new QuestException("Error while pasting a schematic: " + e.getMessage(), e);
         }
     }

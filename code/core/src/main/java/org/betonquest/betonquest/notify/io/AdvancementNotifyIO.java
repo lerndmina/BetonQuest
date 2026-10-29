@@ -12,13 +12,13 @@ import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.service.placeholder.PlaceholderManager;
 import org.betonquest.betonquest.lib.version.MinecraftVersion;
 import org.betonquest.betonquest.notify.NotifyIO;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.logging.Level;
 
 /**
  * Displays the message as advancement.
@@ -68,17 +69,31 @@ public class AdvancementNotifyIO extends NotifyIO {
         final UUID uuid = UUID.randomUUID();
         final NamespacedKey rootKey = new NamespacedKey("betonquest", "notify/" + uuid + "-root");
         final NamespacedKey key = new NamespacedKey("betonquest", "notify/" + uuid + "-message");
+        final Player player = onlineProfile.getPlayer();
+        if (!Scheduling.isGlobalTickThread() && plugin.getServer().isPrimaryThread()) {
+            // A region thread (Folia only) must neither change the server's advancements nor wait for the global region
+            Scheduling.runGlobal(plugin, () -> {
+                try {
+                    loadAdvancement(message, rootKey, key);
+                } catch (final QuestException e) {
+                    plugin.getLogger().log(Level.WARNING, "Could not show advancement notification: " + e.getMessage(), e);
+                    return;
+                }
+                showAndRemove(player, rootKey, key);
+            });
+            return;
+        }
         loadAdvancementSync(message, rootKey, key);
+        showAndRemove(player, rootKey, key);
+    }
 
-        Bukkit.getScheduler().runTask(plugin, run -> grant(key, onlineProfile.getPlayer()));
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                revoke(key, onlineProfile.getPlayer());
-                remove(key);
-                remove(rootKey);
-            }
-        }.runTaskLater(plugin, 10);
+    private void showAndRemove(final Player player, final NamespacedKey rootKey, final NamespacedKey key) {
+        Scheduling.runForEntity(plugin, player, () -> grant(key, player));
+        Scheduling.runForEntityLater(plugin, player, () -> {
+            revoke(key, player);
+            remove(key);
+            remove(rootKey);
+        }, 10);
     }
 
     @Override
@@ -99,11 +114,11 @@ public class AdvancementNotifyIO extends NotifyIO {
     }
 
     private void loadAdvancementSync(final JsonElement message, final NamespacedKey rootKey, final NamespacedKey key) throws QuestException {
-        if (plugin.getServer().isPrimaryThread()) {
+        if (Scheduling.isGlobalTickThread()) {
             loadAdvancement(message, rootKey, key);
             return;
         }
-        final Future<QuestException> future = plugin.getServer().getScheduler().callSyncMethod(plugin, () -> {
+        final Future<QuestException> future = Scheduling.supplyGlobal(plugin, () -> {
             try {
                 loadAdvancement(message, rootKey, key);
                 return null;
@@ -123,12 +138,7 @@ public class AdvancementNotifyIO extends NotifyIO {
 
     @SuppressWarnings("deprecation")
     private void remove(final NamespacedKey key) {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Bukkit.getUnsafe().removeAdvancement(key);
-            }
-        }.runTask(plugin);
+        Scheduling.runGlobal(plugin, () -> Bukkit.getUnsafe().removeAdvancement(key));
     }
 
     private void grant(final NamespacedKey key, final Player player) {

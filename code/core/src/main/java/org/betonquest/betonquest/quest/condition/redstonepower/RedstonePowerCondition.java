@@ -1,9 +1,11 @@
 package org.betonquest.betonquest.quest.condition.redstonepower;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.condition.NullableCondition;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,13 +38,19 @@ public class RedstonePowerCondition implements NullableCondition {
     @Override
     public boolean check(@Nullable final Profile profile) throws QuestException {
         final Location locationValue = location.getValue(profile);
-        final int blockPower = locationValue.getBlock().getBlockPower();
         final int requiredPower = powered.getValue(profile).intValue();
+        final int blockPower = Scheduling.callAtLocation(BetonQuest.getInstance(), locationValue,
+                () -> locationValue.getBlock().getBlockPower());
         return blockPower >= requiredPower;
     }
 
+    /**
+     * Reads the world on its own: on the thread owning the location, waiting for it from an async thread.
+     *
+     * @return false, the condition does not need to start on the thread owning the profile
+     */
     @Override
     public boolean isPrimaryThreadEnforced() {
-        return true;
+        return false;
     }
 }

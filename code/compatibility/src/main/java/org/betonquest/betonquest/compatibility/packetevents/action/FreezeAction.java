@@ -6,7 +6,7 @@ import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.action.OnlineAction;
 import org.betonquest.betonquest.compatibility.packetevents.passenger.FakeArmorStandPassenger;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -51,6 +51,6 @@ public class FreezeAction implements OnlineAction {
         final FakeArmorStandPassenger armorStandPassenger = new FakeArmorStandPassenger(plugin, packetEventsAPI, player);
         armorStandPassenger.mount(player.getLocation());
 
-        Bukkit.getScheduler().runTaskLater(plugin, armorStandPassenger::unmount, ticks);
+        Scheduling.runForEntityLaterOrGlobal(plugin, player, armorStandPassenger::unmount, ticks);
     }
 }

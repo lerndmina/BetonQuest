@@ -13,9 +13,8 @@ import org.betonquest.betonquest.id.IdentifierUtil;
 import org.betonquest.betonquest.kernel.processor.TypedQuestProcessor;
 import org.betonquest.betonquest.kernel.processor.adapter.ActionAdapter;
 import org.betonquest.betonquest.kernel.registry.quest.ActionTypeRegistry;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -24,16 +23,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Supplier;
 
 /**
  * Stores Actions and execute them.
  */
 public class ActionProcessor extends TypedQuestProcessor<ActionIdentifier, ActionAdapter> implements ActionManager {
-
-    /**
-     * The Bukkit scheduler to run sync tasks.
-     */
-    private final BukkitScheduler scheduler;
 
     /**
      * The plugin instance.
@@ -51,17 +46,15 @@ public class ActionProcessor extends TypedQuestProcessor<ActionIdentifier, Actio
      * @param log                     the custom logger for this class
      * @param actionIdentifierFactory the factory to create action identifiers
      * @param actionTypes             the available action types
-     * @param scheduler               the bukkit scheduler to run sync tasks
      * @param instructionApi          the instruction api
      * @param plugin                  the plugin instance
      * @param conditionManager        the condition manager instance
      */
     public ActionProcessor(final BetonQuestLogger log,
                            final IdentifierFactory<ActionIdentifier> actionIdentifierFactory,
-                           final ActionTypeRegistry actionTypes, final BukkitScheduler scheduler,
+                           final ActionTypeRegistry actionTypes,
                            final Instructions instructionApi, final Plugin plugin, final ConditionManager conditionManager) {
         super(log, actionTypes, actionIdentifierFactory, instructionApi, "Action", "actions");
-        this.scheduler = scheduler;
         this.plugin = plugin;
         this.sectionFactory = identifier -> {
             final List<ActionIdentifier> identifiers = IdentifierUtil.subsectionIdentifiers(identifierFactory, identifier);
@@ -78,7 +71,7 @@ public class ActionProcessor extends TypedQuestProcessor<ActionIdentifier, Actio
 
     @Override
     public boolean run(@Nullable final Profile profile, final Collection<ActionIdentifier> actionIDS) {
-        if (Bukkit.isPrimaryThread()) {
+        if (ProfileThreads.isOwnedByCurrentThread(profile)) {
             return actionIDS.stream().map(actionID -> run(profile, actionID)).reduce(true, Boolean::logicalAnd);
         }
 
@@ -91,7 +84,7 @@ public class ActionProcessor extends TypedQuestProcessor<ActionIdentifier, Actio
         });
 
         final Future<Boolean> syncFuture = syncList.isEmpty() ? CompletableFuture.completedFuture(true)
-                : scheduler.callSyncMethod(plugin, () -> syncList.stream().map(actionID -> run(profile, actionID))
+                : onOwningThread(profile, () -> syncList.stream().map(actionID -> run(profile, actionID))
                 .reduce(true, Boolean::logicalAnd));
         final boolean asyncResult = asyncList.stream().map(actionID -> run(profile, actionID)).reduce(true, Boolean::logicalAnd);
 
@@ -115,7 +108,7 @@ public class ActionProcessor extends TypedQuestProcessor<ActionIdentifier, Actio
         } else {
             log.debug(actionID.getPackage(), "Firing action " + actionID + " for " + profile);
         }
-        if (action.isPrimaryThreadEnforced() && !Bukkit.isPrimaryThread()) {
+        if (action.isPrimaryThreadEnforced() && !ProfileThreads.isOwnedByCurrentThread(profile)) {
             return callActionSync(profile, actionID, action);
         }
         return callAction(profile, actionID, action);
@@ -123,11 +116,34 @@ public class ActionProcessor extends TypedQuestProcessor<ActionIdentifier, Actio
 
     private boolean callActionSync(@Nullable final Profile profile, final ActionIdentifier actionID, final ActionAdapter action) {
         try {
-            return scheduler.callSyncMethod(plugin, () -> callAction(profile, actionID, action)).get();
+            return onOwningThread(profile, () -> callAction(profile, actionID, action)).get();
         } catch (final InterruptedException | ExecutionException e) {
             log.reportException(e);
             return true;
         }
+    }
+
+    /**
+     * Runs the task on the server thread owning the profile's player.
+     * <p>
+     * An async thread waits for the result. A server thread that does not own the player (another region on Folia,
+     * never the case on Paper) must not wait for another region, so the task is queued there and counted as
+     * successful.
+     *
+     * @param profile the profile the actions run for
+     * @param task    the task running the actions
+     * @return the future result
+     */
+    private CompletableFuture<Boolean> onOwningThread(@Nullable final Profile profile, final Supplier<Boolean> task) {
+        if (ProfileThreads.isServerThread()) {
+            ProfileThreads.execute(plugin, profile, () -> {
+                if (!task.get()) {
+                    log.debug("Actions queued on the thread owning " + profile + " did not all succeed");
+                }
+            });
+            return CompletableFuture.completedFuture(true);
+        }
+        return ProfileThreads.supply(plugin, profile, task);
     }
 
     private boolean callAction(@Nullable final Profile profile, final ActionIdentifier actionID, final ActionAdapter action) {

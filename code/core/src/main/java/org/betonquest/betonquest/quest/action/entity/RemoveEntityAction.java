@@ -1,11 +1,13 @@
 package org.betonquest.betonquest.quest.action.entity;
 
 import net.kyori.adventure.text.Component;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.util.EntityUtils;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -74,11 +76,15 @@ public class RemoveEntityAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
-        final Location location = loc.getValue(profile);
+        final Location resolvedLocation = loc.getValue(profile);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), resolvedLocation, () -> executeInRegion(profile, resolvedLocation));
+    }
+
+    private void executeInRegion(@Nullable final Profile profile, final Location resolvedLocation) throws QuestException {
         final Component name = this.name == null ? null : this.name.getValue(profile);
         final String resolvedMarked = marked == null ? null : marked.getValue(profile);
         final double resolvedRange = range.getValue(profile).doubleValue();
-        final List<Entity> entities = EntityUtils.getSelectedEntity(location, name, resolvedMarked, resolvedRange);
+        final List<Entity> entities = EntityUtils.getSelectedEntity(resolvedLocation, name, resolvedMarked, resolvedRange);
         for (final EntityType type : types.getValue(profile)) {
             removeEntities(profile, type, entities);
         }

@@ -16,10 +16,11 @@ import org.betonquest.betonquest.api.service.npc.NpcRegistry;
 import org.betonquest.betonquest.api.text.TextParser;
 import org.betonquest.betonquest.database.Connector;
 import org.betonquest.betonquest.kernel.processor.PostLoadTask;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,7 +40,7 @@ public class NpcHologramLoop extends HologramLoop implements PostLoadTask {
     /**
      * The task that lets holograms follow NPCs.
      */
-    private final BukkitTask followTask;
+    private final TaskHandle followTask;
 
     /**
      * List of all {@link NpcHologram}s.
@@ -91,8 +92,8 @@ public class NpcHologramLoop extends HologramLoop implements PostLoadTask {
         this.npcManager = npcManager;
         this.npcRegistry = npcRegistry;
         npcHolograms = new ArrayList<>();
-        followTask = plugin.getServer().getScheduler().runTaskTimer(plugin,
-                () -> npcHolograms.stream().filter(NpcHologram::follow)
+        followTask = Scheduling.runGlobalTimer(plugin,
+                task -> npcHolograms.stream().filter(NpcHologram::follow)
                         .forEach(this::updateNpcHologram), 1L, 1L);
     }
 
@@ -134,7 +135,7 @@ public class NpcHologramLoop extends HologramLoop implements PostLoadTask {
     @Override
     public void startAll() {
         log.debug("Delaying NPC Hologram creation…");
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        Scheduling.runGlobal(plugin, () -> {
             log.debug("Loading delayed NPC Holograms.");
             npcHolograms.forEach(holo -> {
                 for (final Map.Entry<NpcIdentifier, Map<Object, BetonHologram>> entry : holo.npcHolograms.entrySet()) {
@@ -244,7 +245,7 @@ public class NpcHologramLoop extends HologramLoop implements PostLoadTask {
                 .filter(npcHologram -> ids.stream().anyMatch(npcId -> npcHologram.npcHolograms().containsKey(npcId)))
                 .toList();
         if (!list.isEmpty()) {
-            plugin.getServer().getScheduler().runTask(plugin, () -> list.forEach(this::updateNpcHologram));
+            Scheduling.runGlobal(plugin, () -> list.forEach(this::updateNpcHologram));
         }
     }
 

@@ -15,7 +15,6 @@ import org.betonquest.betonquest.kernel.processor.quest.PlaceholderProcessor;
 import org.betonquest.betonquest.kernel.registry.quest.PlaceholderTypeRegistry;
 import org.betonquest.betonquest.lib.dependency.component.AbstractCoreComponent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.Set;
 
@@ -33,8 +32,7 @@ public class PlaceholdersComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, BukkitScheduler.class,
-                QuestPackageManager.class, BetonQuestLoggerFactory.class,
+        return Set.of(Plugin.class, QuestPackageManager.class, BetonQuestLoggerFactory.class,
                 Identifiers.class, Instructions.class, ProcessorDataLoader.class);
     }
 
@@ -49,7 +47,6 @@ public class PlaceholdersComponent extends AbstractCoreComponent {
         final Identifiers identifiers = getDependency(Identifiers.class);
         final BetonQuestLoggerFactory loggerFactory = getDependency(BetonQuestLoggerFactory.class);
         final Instructions instructions = getDependency(Instructions.class);
-        final BukkitScheduler bukkitScheduler = getDependency(BukkitScheduler.class);
         final Plugin plugin = getDependency(Plugin.class);
         final ProcessorDataLoader processorDataLoader = getDependency(ProcessorDataLoader.class);
 
@@ -57,7 +54,7 @@ public class PlaceholdersComponent extends AbstractCoreComponent {
         identifiers.register(PlaceholderIdentifier.class, placeholderIdentifierFactory);
         final PlaceholderTypeRegistry placeholderTypeRegistry = new PlaceholderTypeRegistry(loggerFactory.create(PlaceholderTypeRegistry.class));
         final PlaceholderProcessor placeholderProcessor = new PlaceholderProcessor(loggerFactory.create(PlaceholderProcessor.class),
-                questPackageManager, placeholderTypeRegistry, bukkitScheduler, placeholderIdentifierFactory, instructions, plugin);
+                questPackageManager, placeholderTypeRegistry, placeholderIdentifierFactory, instructions, plugin);
 
         dependencyProvider.take(PlaceholderIdentifierFactory.class, placeholderIdentifierFactory);
         dependencyProvider.take(PlaceholderTypeRegistry.class, placeholderTypeRegistry);
