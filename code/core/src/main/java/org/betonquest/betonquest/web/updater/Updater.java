@@ -10,8 +10,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.MalformedURLException;
@@ -24,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -68,14 +67,9 @@ public class Updater implements FastStatsMetricsProvider {
     private final UpdateDownloader updateDownloader;
 
     /**
-     * The {@link Plugin} instance.
+     * Executor running tasks off the server threads.
      */
-    private final Plugin plugin;
-
-    /**
-     * The {@link BukkitScheduler} instance.
-     */
-    private final BukkitScheduler scheduler;
+    private final Executor asyncExecutor;
 
     /**
      * The {@link InstantSource} instance.
@@ -119,20 +113,18 @@ public class Updater implements FastStatsMetricsProvider {
      * @param currentVersion      the current version of the plugin
      * @param updateSourceHandler the {@link UpdateSourceHandler} to get all available versions
      * @param updateDownloader    the {@link UpdateDownloader} to download new versions
-     * @param plugin              the {@link Plugin} instance
-     * @param scheduler           the {@link BukkitScheduler} instance
+     * @param asyncExecutor       the executor running tasks off the server threads
      * @param instantSource       the {@link InstantSource} instance
      */
     public Updater(final BetonQuestLogger log, final UpdaterConfig config, final Version currentVersion,
                    final UpdateSourceHandler updateSourceHandler, final UpdateDownloader updateDownloader,
-                   final Plugin plugin, final BukkitScheduler scheduler, final InstantSource instantSource) {
+                   final Executor asyncExecutor, final InstantSource instantSource) {
         this.log = log;
         this.config = config;
         this.latest = Pair.of(currentVersion, null);
         this.updateSourceHandler = updateSourceHandler;
         this.updateDownloader = updateDownloader;
-        this.plugin = plugin;
-        this.scheduler = scheduler;
+        this.asyncExecutor = asyncExecutor;
         this.instantSource = instantSource;
         this.lastNotification = new HashMap<>();
         this.updateMetric = new AtomicInteger(0);
@@ -160,7 +152,7 @@ public class Updater implements FastStatsMetricsProvider {
             return;
         }
 
-        scheduler.runTaskAsynchronously(plugin, () -> {
+        asyncExecutor.execute(() -> {
             if (searchUpdate()) {
                 final boolean automatic = config.isAutomatic();
                 log.info(getUpdateNotification(automatic));
@@ -234,7 +226,7 @@ public class Updater implements FastStatsMetricsProvider {
      * @param sender The {@link CommandSender} that should receive the update related messages.
      */
     public void update(@Nullable final CommandSender sender) {
-        scheduler.runTaskAsynchronously(plugin, () -> {
+        asyncExecutor.execute(() -> {
             try {
                 checkUpdateRequirements();
 

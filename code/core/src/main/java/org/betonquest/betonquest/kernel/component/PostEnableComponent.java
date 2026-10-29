@@ -14,8 +14,8 @@ import org.betonquest.betonquest.kernel.ProcessorDataLoader;
 import org.betonquest.betonquest.lib.dependency.component.AbstractCoreComponent;
 import org.betonquest.betonquest.menu.RPGMenu;
 import org.betonquest.betonquest.playerhider.PlayerHider;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.Set;
 
@@ -33,7 +33,7 @@ public class PostEnableComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, BukkitScheduler.class, ConfigAccessor.class,
+        return Set.of(Plugin.class, ConfigAccessor.class,
                 Compatibility.class, PlayerDataStorage.class, ProfileProvider.class, QuestPackageManager.class,
                 PlayerHider.class, RPGMenu.class, Conversations.class, Instructions.class,
                 ProcessorDataLoader.class, IntegrationManager.class, BetonQuestApiService.class);
@@ -42,7 +42,6 @@ public class PostEnableComponent extends AbstractCoreComponent {
     @Override
     protected void load(final DependencyProvider dependencyProvider) {
         final Plugin plugin = getDependency(Plugin.class);
-        final BukkitScheduler scheduler = getDependency(BukkitScheduler.class);
         final ConfigAccessor config = getDependency(ConfigAccessor.class);
         final Instructions instructions = getDependency(Instructions.class);
         final Compatibility compatibility = getDependency(Compatibility.class);
@@ -56,14 +55,14 @@ public class PostEnableComponent extends AbstractCoreComponent {
         final IntegrationManager integrationManager = getDependency(IntegrationManager.class);
         final BetonQuestApiService betonQuestApiService = getDependency(BetonQuestApiService.class);
 
-        scheduler.scheduleSyncDelayedTask(plugin, () -> {
+        Scheduling.runGlobal(plugin, () -> {
             integrationManager.postEnable(betonQuestApiService);
             compatibility.logAndInitHologramProvider();
             processorDataLoader.loadData(packageManager.getPackages().values());
             menu.syncCommands();
             dataStorage.initProfiles(profileProvider.getOnlineProfiles(), conversations);
             playerHider.load(packageManager, instructions);
-            playerHider.start(scheduler, config);
+            playerHider.start(config);
         });
     }
 }

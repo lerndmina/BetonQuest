@@ -42,7 +42,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, false, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertTrue(updater.isUpdateAvailable(), "Expected update available");
@@ -66,7 +66,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, false, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertFalse(updater.isUpdateAvailable(), "Expected no available update");
@@ -91,7 +91,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, true, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertTrue(updater.isUpdateAvailable(), "Expected update available");
@@ -134,7 +134,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, true, "PATCH_DEV", true);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertFalse(updater.isUpdateAvailable(), "Expected no available update");
@@ -170,7 +170,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, false, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertTrue(updater.isUpdateAvailable(), "Expected update available");
@@ -204,7 +204,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, false, "PATCH_DEV", true);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertTrue(updater.isUpdateAvailable(), "Expected update available");
@@ -234,7 +234,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, true, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertTrue(updater.isUpdateAvailable(), "Expected update available");
@@ -267,7 +267,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, false, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertFalse(updater.isUpdateAvailable(), "Expected no available update");
@@ -299,7 +299,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, true, false, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, downloader, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertFalse(updater.isUpdateAvailable(), "Expected no available update");
@@ -327,7 +327,7 @@ class UpdaterTest {
         final UpdaterConfigTest.Input patchDev = new UpdaterConfigTest.Input(null, false, false, "PATCH_DEV", false);
         final UpdaterConfig updaterConfig = UpdaterConfigTest.getMockedConfig(logger, patchDev, version);
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
-            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, plugin, scheduler, instantSource);
+            final Updater updater = new Updater(logger, updaterConfig, version, handler, null, task -> scheduler.runTaskAsynchronously(plugin, task), instantSource);
             assertTrue(scheduler.waitAsyncTasksFinished(), "Expected async tasks to finish");
             scheduler.assertNoExceptions();
             assertFalse(updater.isUpdateAvailable(), "Expected no update available");

@@ -133,7 +133,7 @@ public class ConditionTypesComponent extends AbstractCoreComponent {
         conditionTypes.register("effect", new EffectConditionFactory());
         conditionTypes.register("empty", new EmptySlotsConditionFactory());
         conditionTypes.registerCombined("entities", new EntityConditionFactory());
-        conditionTypes.registerCombined("eval", new EvalConditionFactory(instructions, conditionTypes, server.getScheduler(), plugin));
+        conditionTypes.registerCombined("eval", new EvalConditionFactory(instructions, conditionTypes, plugin));
         conditionTypes.register("experience", new ExperienceConditionFactory());
         conditionTypes.register("facing", new FacingConditionFactory());
         conditionTypes.register("fly", new FlyingConditionFactory());

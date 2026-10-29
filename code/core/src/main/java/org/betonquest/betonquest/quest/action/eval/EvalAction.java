@@ -10,12 +10,9 @@ import org.betonquest.betonquest.api.quest.action.NullableAction;
 import org.betonquest.betonquest.api.service.instruction.Instructions;
 import org.betonquest.betonquest.kernel.processor.adapter.ActionAdapter;
 import org.betonquest.betonquest.kernel.registry.quest.ActionTypeRegistry;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.ExecutionException;
 
 /**
  * An action which evaluates to another action.
@@ -43,11 +40,6 @@ public class EvalAction implements NullableAction {
     private final Argument<String> evaluation;
 
     /**
-     * The scheduler to use for synchronous execution.
-     */
-    private final BukkitScheduler scheduler;
-
-    /**
      * The plugin instance.
      */
     private final Plugin plugin;
@@ -59,16 +51,14 @@ public class EvalAction implements NullableAction {
      * @param actionTypeRegistry the action type registry providing factories to parse the evaluated instruction
      * @param pack               the quest package to relate the action to
      * @param evaluation         the evaluation input
-     * @param scheduler          the scheduler to use for synchronous execution
      * @param plugin             the plugin instance
      */
     public EvalAction(final Instructions instructions, final ActionTypeRegistry actionTypeRegistry, final QuestPackage pack,
-                      final Argument<String> evaluation, final BukkitScheduler scheduler, final Plugin plugin) {
+                      final Argument<String> evaluation, final Plugin plugin) {
         this.instructions = instructions;
         this.actionTypeRegistry = actionTypeRegistry;
         this.pack = pack;
         this.evaluation = evaluation;
-        this.scheduler = scheduler;
         this.plugin = plugin;
     }
 
@@ -92,14 +82,20 @@ public class EvalAction implements NullableAction {
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
         final ActionAdapter action = createAction(instructions, actionTypeRegistry, pack, evaluation.getValue(profile));
-        if (action.isPrimaryThreadEnforced() && !Bukkit.isPrimaryThread()) {
-            try {
-                scheduler.callSyncMethod(plugin, () -> action.fire(profile)).get();
-                return;
-            } catch (InterruptedException | ExecutionException e) {
-                throw new QuestException("Failed to execute action in primary thread", e);
-            }
+        if (!action.isPrimaryThreadEnforced() || ProfileThreads.isOwnedByCurrentThread(profile)) {
+            action.fire(profile);
+        } else if (ProfileThreads.isServerThread()) {
+            ProfileThreads.execute(plugin, profile, () -> fireLogged(action, profile));
+        } else {
+            ProfileThreads.call(plugin, profile, () -> action.fire(profile));
         }
-        action.fire(profile);
+    }
+
+    private void fireLogged(final ActionAdapter action, @Nullable final Profile profile) {
+        try {
+            action.fire(profile);
+        } catch (final QuestException e) {
+            plugin.getLogger().warning("Error while firing evaluated action in '" + pack.getQuestPath() + "': " + e.getMessage());
+        }
     }
 }

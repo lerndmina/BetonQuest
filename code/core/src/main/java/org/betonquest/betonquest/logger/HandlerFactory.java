@@ -15,9 +15,9 @@ import org.betonquest.betonquest.logger.handler.history.BukkitSchedulerCleaningL
 import org.betonquest.betonquest.logger.handler.history.DiscardingLogQueue;
 import org.betonquest.betonquest.logger.handler.history.HistoryHandler;
 import org.betonquest.betonquest.logger.handler.history.LogRecordQueue;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,7 +36,6 @@ import java.util.logging.Handler;
 /**
  * A static helper class to create {@link Handler}s in the way they are usually used by BetonQuest.
  */
-@SuppressWarnings("PMD.CouplingBetweenObjects")
 public final class HandlerFactory {
 
     private HandlerFactory() {
@@ -63,15 +62,14 @@ public final class HandlerFactory {
      *
      * @param loggerFactory logger factory to use
      * @param plugin        {@link Plugin} instance
-     * @param scheduler     {@link BukkitScheduler} instance
      * @param config        {@link ConfigAccessor} instance
      * @param logFileFolder {@link File} to the log folder
      * @param instantSource {@link InstantSource} instance
      * @return a new {@link HistoryHandler}
      */
-    public static HistoryHandler createHistoryHandler(final BetonQuestLoggerFactory loggerFactory, final Plugin plugin, final BukkitScheduler scheduler, final FileConfigAccessor config, final File logFileFolder, final InstantSource instantSource) {
+    public static HistoryHandler createHistoryHandler(final BetonQuestLoggerFactory loggerFactory, final Plugin plugin, final FileConfigAccessor config, final File logFileFolder, final InstantSource instantSource) {
         final DebugHandlerConfig debugHandlerConfig = new DebugHandlerConfig(config, logFileFolder);
-        final LogRecordQueue logQueue = createLogRecordQueue(plugin, scheduler, instantSource, debugHandlerConfig.getExpireAfterMinutes());
+        final LogRecordQueue logQueue = createLogRecordQueue(plugin, instantSource, debugHandlerConfig.getExpireAfterMinutes());
         final ResettableHandler targetHandler = createDebugLogFileHandler(loggerFactory, debugHandlerConfig.getLogFile(), instantSource);
         final HistoryHandler historyHandler = new HistoryHandler(debugHandlerConfig.isDebugging(), debugHandlerConfig::setDebugging, logQueue, targetHandler);
         historyHandler.setFilter(new LogRecordTypeFilter(BetonQuestLogRecord.class));
@@ -83,12 +81,12 @@ public final class HandlerFactory {
         return new ResettableHandler(() -> new LazyHandler(log, () -> setupFileHandler(logFile, instantSource)));
     }
 
-    private static LogRecordQueue createLogRecordQueue(final Plugin plugin, final BukkitScheduler scheduler, final InstantSource instantSource, final int keepMinutes) {
+    private static LogRecordQueue createLogRecordQueue(final Plugin plugin, final InstantSource instantSource, final int keepMinutes) {
         if (keepMinutes == 0) {
             return new DiscardingLogQueue();
         }
         final BukkitSchedulerCleaningLogQueue bukkitQueue = new BukkitSchedulerCleaningLogQueue(instantSource, Duration.of(keepMinutes, ChronoUnit.MINUTES));
-        bukkitQueue.runCleanupTimerAsynchronously(scheduler, plugin, 20, 20);
+        Scheduling.runAsyncTimer(plugin, task -> bukkitQueue.removeExpiredRecords(), 20, 20);
         return bukkitQueue;
     }
 

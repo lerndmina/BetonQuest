@@ -10,7 +10,6 @@ import org.betonquest.betonquest.api.quest.condition.PlayerlessConditionFactory;
 import org.betonquest.betonquest.api.service.instruction.Instructions;
 import org.betonquest.betonquest.kernel.registry.quest.ConditionTypeRegistry;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 /**
  * A factory for creating Eval conditions.
@@ -28,11 +27,6 @@ public class EvalConditionFactory implements PlayerConditionFactory, PlayerlessC
     private final ConditionTypeRegistry conditionTypeRegistry;
 
     /**
-     * The scheduler to use for synchronous execution.
-     */
-    private final BukkitScheduler scheduler;
-
-    /**
      * The plugin instance.
      */
     private final Plugin plugin;
@@ -42,14 +36,12 @@ public class EvalConditionFactory implements PlayerConditionFactory, PlayerlessC
      *
      * @param instructions          the BetonQuest instructions used to parse instructions
      * @param conditionTypeRegistry the condition type registry providing factories to parse the evaluated instruction
-     * @param scheduler             the scheduler to use for synchronous execution
      * @param plugin                the plugin instance
      */
     public EvalConditionFactory(final Instructions instructions,
-                                final ConditionTypeRegistry conditionTypeRegistry, final BukkitScheduler scheduler, final Plugin plugin) {
+                                final ConditionTypeRegistry conditionTypeRegistry, final Plugin plugin) {
         this.instructions = instructions;
         this.conditionTypeRegistry = conditionTypeRegistry;
-        this.scheduler = scheduler;
         this.plugin = plugin;
     }
 
@@ -66,6 +58,6 @@ public class EvalConditionFactory implements PlayerConditionFactory, PlayerlessC
     private NullableConditionAdapter parseEvalCondition(final Instruction instruction) throws QuestException {
         final String rawInstruction = String.join(" ", instruction.getValueParts());
         return new NullableConditionAdapter(new EvalCondition(instructions, conditionTypeRegistry,
-                instruction.getPackage(), instruction.chainForArgument(rawInstruction).string().get(), scheduler, plugin));
+                instruction.getPackage(), instruction.chainForArgument(rawInstruction).string().get(), plugin));
     }
 }

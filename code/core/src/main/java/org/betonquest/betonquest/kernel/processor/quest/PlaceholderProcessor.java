@@ -14,12 +14,9 @@ import org.betonquest.betonquest.api.service.placeholder.PlaceholderManager;
 import org.betonquest.betonquest.kernel.processor.TypedQuestProcessor;
 import org.betonquest.betonquest.kernel.processor.adapter.PlaceholderAdapter;
 import org.betonquest.betonquest.kernel.registry.quest.PlaceholderTypeRegistry;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.ExecutionException;
 
 /**
  * Stores Placeholders and resolve them.
@@ -52,11 +49,6 @@ public class PlaceholderProcessor extends TypedQuestProcessor<PlaceholderIdentif
     private final QuestPackageManager packManager;
 
     /**
-     * The Bukkit scheduler to run sync tasks.
-     */
-    private final BukkitScheduler scheduler;
-
-    /**
      * The plugin instance.
      */
     private final Plugin plugin;
@@ -67,19 +59,17 @@ public class PlaceholderProcessor extends TypedQuestProcessor<PlaceholderIdentif
      * @param log                          the custom logger for this class
      * @param packManager                  the quest package manager to get quest packages from
      * @param placeholderTypes             the available placeholder types
-     * @param scheduler                    the bukkit scheduler to run sync tasks
      * @param placeholderIdentifierFactory the factory to create placeholder identifiers
      * @param instructionApi               the instruction api
      * @param plugin                       the plugin instance
      */
     public PlaceholderProcessor(final BetonQuestLogger log, final QuestPackageManager packManager,
-                                final PlaceholderTypeRegistry placeholderTypes, final BukkitScheduler scheduler,
+                                final PlaceholderTypeRegistry placeholderTypes,
                                 final IdentifierFactory<PlaceholderIdentifier> placeholderIdentifierFactory,
                                 final Instructions instructionApi, final Plugin plugin) {
         super(log, placeholderTypes, placeholderIdentifierFactory,
                 instructionApi, "Placeholder", "placeholders");
         this.packManager = packManager;
-        this.scheduler = scheduler;
         this.plugin = plugin;
     }
 
@@ -117,7 +107,7 @@ public class PlaceholderProcessor extends TypedQuestProcessor<PlaceholderIdentif
         } catch (final QuestException e) {
             throw new QuestException("Could not create placeholder '" + name + "': " + e.getMessage(), e);
         }
-        if (placeholder.isPrimaryThreadEnforced() && !Bukkit.isPrimaryThread()) {
+        if (placeholder.isPrimaryThreadEnforced() && !ProfileThreads.isServerThread()) {
             return valueSync(profile, name, placeholder);
         }
         return value(profile, name, placeholder);
@@ -139,12 +129,7 @@ public class PlaceholderProcessor extends TypedQuestProcessor<PlaceholderIdentif
     }
 
     private String valueSync(@Nullable final Profile profile, final String placeholderString, final PlaceholderAdapter placeholder) throws QuestException {
-        try {
-            return scheduler.callSyncMethod(plugin, () -> value(profile, placeholderString, placeholder)).get();
-        } catch (final InterruptedException | ExecutionException e) {
-            log.reportException(e);
-            throw new QuestException(e);
-        }
+        return ProfileThreads.call(plugin, profile, () -> value(profile, placeholderString, placeholder));
     }
 
     private String value(@Nullable final Profile profile, final String placeholderString, final PlaceholderAdapter placeholder) throws QuestException {

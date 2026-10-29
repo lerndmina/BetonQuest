@@ -11,10 +11,10 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.api.service.instruction.Instructions;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -58,7 +58,7 @@ public class PlayerHider {
      * The running hider.
      */
     @Nullable
-    private BukkitTask bukkitTask;
+    private TaskHandle bukkitTask;
 
     /**
      * Initialize and start a new {@link PlayerHider}.
@@ -106,16 +106,14 @@ public class PlayerHider {
     /**
      * Starts the {@link PlayerHider}.
      *
-     * @param scheduler the scheduler to use
-     * @param config    the config accessor
+     * @param config the config accessor
      */
-    @SuppressWarnings("PMD.LambdaCanBeMethodReference")
-    public void start(final BukkitScheduler scheduler, final ConfigAccessor config) {
+    public void start(final ConfigAccessor config) {
         final long updateInterval = config.getLong("hider.player_update_interval", 20);
         if (updateInterval <= 0) {
             return;
         }
-        bukkitTask = scheduler.runTaskTimer(plugin, () -> updateVisibility(), 1, updateInterval);
+        bukkitTask = Scheduling.runGlobalTimer(plugin, task -> updateVisibility(), 1, updateInterval);
     }
 
     /**
@@ -149,7 +147,8 @@ public class PlayerHider {
         final Collection<? extends OnlineProfile> onlineProfiles = profileProvider.getOnlineProfiles();
         final Map<OnlineProfile, List<OnlineProfile>> profilesToHide = getProfilesToHide(onlineProfiles, onlineProfiles);
         for (final OnlineProfile source : onlineProfiles) {
-            updateVisibilityForProfiles(onlineProfiles, source, profilesToHide.get(source));
+            final List<OnlineProfile> toHide = profilesToHide.get(source);
+            Scheduling.executeForEntity(plugin, source.getPlayer(), () -> updateVisibilityForProfiles(onlineProfiles, source, toHide));
         }
     }
 
@@ -161,7 +160,8 @@ public class PlayerHider {
     public void updateVisibility(final OnlineProfile profile) {
         final Collection<? extends OnlineProfile> onlineProfiles = profileProvider.getOnlineProfiles();
         final Map<OnlineProfile, List<OnlineProfile>> profilesToHide = getProfilesToHide(onlineProfiles, List.of(profile));
-        updateVisibilityForProfiles(onlineProfiles, profile, profilesToHide.get(profile));
+        final List<OnlineProfile> toHide = profilesToHide.get(profile);
+        Scheduling.executeForEntity(plugin, profile.getPlayer(), () -> updateVisibilityForProfiles(onlineProfiles, profile, toHide));
     }
 
     private void updateVisibilityForProfiles(final Collection<? extends OnlineProfile> onlineProfiles, final OnlineProfile source,
