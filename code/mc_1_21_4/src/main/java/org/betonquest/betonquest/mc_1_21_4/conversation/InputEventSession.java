@@ -2,6 +2,7 @@ package org.betonquest.betonquest.mc_1_21_4.conversation;
 
 import org.betonquest.betonquest.conversation.menu.input.ConversationAction;
 import org.betonquest.betonquest.conversation.menu.input.ConversationSession;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.Input;
 import org.bukkit.NamespacedKey;
@@ -105,9 +106,15 @@ public class InputEventSession implements ConversationSession, Listener {
         this.unmount = new Unmount();
     }
 
-    @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
     @Override
     public void begin() {
+        Scheduling.executeForEntity(plugin, player, this::beginFreeze);
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(unmount, plugin);
+    }
+
+    @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+    private void beginFreeze() {
         if (setSpeed) {
             for (final Attribute attribute : ATTRIBUTES) {
                 if (baseSpeed && attribute == Attribute.MOVEMENT_SPEED) {
@@ -132,20 +139,13 @@ public class InputEventSession implements ConversationSession, Listener {
                 }
             }
         }
-
-        Bukkit.getPluginManager().registerEvents(this, plugin);
-        Bukkit.getPluginManager().registerEvents(unmount, plugin);
     }
 
     @Override
     public void end() {
-        if (Bukkit.isPrimaryThread()) {
-            endReset();
-        } else {
-            Bukkit.getScheduler().runTask(plugin, this::endReset);
-        }
+        Scheduling.executeForEntity(plugin, player, this::endReset);
         HandlerList.unregisterAll(this);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> HandlerList.unregisterAll(unmount), 20);
+        Scheduling.runGlobalLater(plugin, () -> HandlerList.unregisterAll(unmount), 20);
     }
 
     private void endReset() {

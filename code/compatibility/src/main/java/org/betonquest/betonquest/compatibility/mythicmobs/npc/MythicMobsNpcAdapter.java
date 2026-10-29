@@ -1,10 +1,11 @@
 package org.betonquest.betonquest.compatibility.mythicmobs.npc;
 
-import io.lumine.mythic.api.adapters.AbstractLocation;
 import io.lumine.mythic.core.mobs.ActiveMob;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.npc.Npc;
 import org.betonquest.betonquest.compatibility.mythicmobs.MythicHider;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -57,7 +58,7 @@ public record MythicMobsNpcAdapter(ActiveMob activeMob, MythicHider mythicHider)
 
     @Override
     public void teleport(final Location location) {
-        activeMob.getEntity().teleport(new AbstractLocation(location.getWorld().getName(), location.getX(), location.getY(), location.getZ()));
+        Scheduling.teleport(BetonQuest.getInstance(), activeMob.getEntity().getBukkitEntity(), location);
     }
 
     @Override

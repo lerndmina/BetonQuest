@@ -15,16 +15,17 @@ import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.service.action.ActionManager;
 import org.betonquest.betonquest.compatibility.npc.citizens.CitizensWalkingListener;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
@@ -35,7 +36,7 @@ public class CitizensMoveController implements Listener, Predicate<NPC> {
     /**
      * Citizens NPC ID and their active move instance.
      */
-    private final Map<Integer, MoveInstance> movingNpcs = new HashMap<>();
+    private final Map<Integer, MoveInstance> movingNpcs = new ConcurrentHashMap<>();
 
     /**
      * Custom {@link BetonQuestLogger} instance for this class.
@@ -316,14 +317,17 @@ public class CitizensMoveController implements Listener, Predicate<NPC> {
 
         private void delayDoneEvents(final NPC npc) {
             npc.getNavigator().setPaused(true);
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    npc.getNavigator().setPaused(false);
-                    movingNpcs.remove(npcId);
-                    actionManager.run(profile, moveData.doneActions());
-                }
-            }.runTaskLater(plugin, moveData.waitTicks());
+            final Runnable done = () -> {
+                npc.getNavigator().setPaused(false);
+                movingNpcs.remove(npcId);
+                actionManager.run(profile, moveData.doneActions());
+            };
+            final Entity entity = npc.isSpawned() ? npc.getEntity() : null;
+            if (entity == null) {
+                Scheduling.runGlobalLater(plugin, done, moveData.waitTicks());
+            } else {
+                Scheduling.runForEntityLaterOrGlobal(plugin, entity, done, moveData.waitTicks());
+            }
         }
     }
 }

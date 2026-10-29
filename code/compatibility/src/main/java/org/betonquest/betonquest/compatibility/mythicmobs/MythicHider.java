@@ -4,20 +4,21 @@ import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 import io.lumine.mythic.bukkit.events.MythicMobDespawnEvent;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.entity.Entity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Hides MythicMobs from the spawn event and NPCs.
@@ -43,7 +44,7 @@ public final class MythicHider implements Listener {
      * The currently active hide loop.
      */
     @Nullable
-    private BukkitTask loop;
+    private TaskHandle loop;
 
     /**
      * Creates a new mythic mobs hider.
@@ -55,7 +56,7 @@ public final class MythicHider implements Listener {
         super();
         this.profileProvider = profileProvider;
         this.plugin = plugin;
-        mythicmobs = new HashMap<>();
+        mythicmobs = new ConcurrentHashMap<>();
     }
 
     /**
@@ -68,13 +69,11 @@ public final class MythicHider implements Listener {
         if (updateInterval <= 0) {
             return;
         }
-        loop = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
-            for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
-                for (final Entity mob : mythicmobs.keySet()) {
-                    applyVisibility(onlineProfile, mob);
-                }
+        loop = Scheduling.runGlobalTimer(plugin, task -> ProfileThreads.forEach(plugin, profileProvider.getOnlineProfiles(), onlineProfile -> {
+            for (final Entity mob : mythicmobs.keySet()) {
+                applyVisibility(onlineProfile, mob);
             }
-        }, 0, updateInterval);
+        }), 1, updateInterval);
     }
 
     /**
@@ -120,14 +119,15 @@ public final class MythicHider implements Listener {
      * @param mythicMob     the mob that you want to hide from other players
      */
     public void applyVisibilityPrivate(final OnlineProfile onlineProfile, final Entity mythicMob) {
-        final Set<UUID> profileUUIDS = new HashSet<>();
+        final Set<UUID> profileUUIDS = ConcurrentHashMap.newKeySet();
         profileUUIDS.add(onlineProfile.getProfileUUID());
         mythicmobs.put(mythicMob, profileUUIDS);
-        for (final OnlineProfile onlinePlayer : profileProvider.getOnlineProfiles()) { // Hiding the mob for all players besides passed in online
+        // Hiding the mob for all players besides passed in online, each on the thread owning that player
+        ProfileThreads.forEach(plugin, profileProvider.getOnlineProfiles(), onlinePlayer -> {
             if (!onlinePlayer.equals(onlineProfile)) {
                 applyVisibility(onlinePlayer, mythicMob);
             }
-        }
+        });
     }
 
     /**

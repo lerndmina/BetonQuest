@@ -13,12 +13,13 @@ import org.betonquest.betonquest.api.quest.objective.ObjectiveState;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.compatibility.traincarts.TrainCartsUtils;
 import org.betonquest.betonquest.lib.profile.ProfileKeyMap;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This {@link CountingObjective} is completed when a player rides a train for a certain amount of time.
@@ -40,7 +41,7 @@ public class TrainCartsRideObjective extends CountingObjective {
     /**
      * The {@link Map} that stores the current amount of time the player has ridden the train.
      */
-    private final Map<Profile, Pair<Long, BukkitTask>> startTimes;
+    private final Map<Profile, Pair<Long, TaskHandle>> startTimes;
 
     /**
      * The name of the train, maybe empty.
@@ -61,7 +62,7 @@ public class TrainCartsRideObjective extends CountingObjective {
         super(service, targetAmount, null);
         this.plugin = plugin;
         this.name = name;
-        this.startTimes = new ProfileKeyMap<>(service.getProfileProvider());
+        this.startTimes = new ProfileKeyMap<>(service.getProfileProvider(), new ConcurrentHashMap<>());
     }
 
     /**
@@ -119,7 +120,7 @@ public class TrainCartsRideObjective extends CountingObjective {
         if (event.getPreviousState() == ObjectiveState.ACTIVE) {
             return;
         }
-        final Pair<Long, BukkitTask> remove = startTimes.remove(profile);
+        final Pair<Long, TaskHandle> remove = startTimes.remove(profile);
         if (remove != null) {
             remove.getValue().cancel();
         }
@@ -127,7 +128,7 @@ public class TrainCartsRideObjective extends CountingObjective {
 
     private void startCount(final OnlineProfile onlineProfile) throws QuestException {
         final int ticksToCompletion = getCountingData(onlineProfile).getAmountLeft() * 20;
-        final BukkitTask bukkitTask = Bukkit.getScheduler().runTaskLater(plugin,
+        final TaskHandle bukkitTask = Scheduling.runGlobalLater(plugin,
                 () -> stopCount(onlineProfile), ticksToCompletion);
 
         startTimes.put(onlineProfile, Pair.of(System.currentTimeMillis(), bukkitTask));
@@ -137,7 +138,7 @@ public class TrainCartsRideObjective extends CountingObjective {
         if (!startTimes.containsKey(onlineProfile)) {
             return;
         }
-        final Pair<Long, BukkitTask> remove = startTimes.remove(onlineProfile);
+        final Pair<Long, TaskHandle> remove = startTimes.remove(onlineProfile);
         remove.getValue().cancel();
         getExceptionHandler().handle(() -> {
             if (!getService().checkConditions(onlineProfile)) {

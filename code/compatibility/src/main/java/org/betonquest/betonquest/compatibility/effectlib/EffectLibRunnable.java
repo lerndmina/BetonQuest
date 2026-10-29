@@ -10,11 +10,14 @@ import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.quest.npc.Npc;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.api.service.npc.NpcManager;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -23,9 +26,9 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link BukkitRunnable} that shows an EffectLib effect to all players that meet the required conditions.
+ * A repeating task that shows an EffectLib effect to all players that meet the required conditions.
  */
-public class EffectLibRunnable extends BukkitRunnable {
+public class EffectLibRunnable implements Runnable {
 
     /**
      * Custom {@link BetonQuestLogger} instance for this class.
@@ -73,6 +76,12 @@ public class EffectLibRunnable extends BukkitRunnable {
     private int lastConditionCheckTick;
 
     /**
+     * The running task, null until started.
+     */
+    @Nullable
+    private TaskHandle task;
+
+    /**
      * Constructs this runnable with the given effect.
      *
      * @param log                 the logger that will be used for logging
@@ -86,7 +95,6 @@ public class EffectLibRunnable extends BukkitRunnable {
     public EffectLibRunnable(final BetonQuestLogger log, final ProfileProvider profileProvider,
                              final EffectManager manager, final EffectConfiguration effectConfiguration,
                              final NpcManager npcManager, final ConditionManager conditionManager) throws QuestException {
-        super();
         this.log = log;
         this.profileProvider = profileProvider;
         this.manager = manager;
@@ -95,6 +103,27 @@ public class EffectLibRunnable extends BukkitRunnable {
         this.conditionManager = conditionManager;
         this.activeProfiles = new ArrayList<>();
         this.conditionCheckInterval = effectConfiguration.conditionCheckInterval().getValue(null).intValue();
+    }
+
+    /**
+     * Starts showing the effect on the global region.
+     *
+     * @param plugin   the plugin to schedule the task for
+     * @param delay    the initial delay in ticks
+     * @param interval the interval in ticks
+     */
+    public void start(final Plugin plugin, final long delay, final long interval) {
+        task = Scheduling.runGlobalTimer(plugin, scheduled -> run(), delay, interval);
+    }
+
+    /**
+     * Stops showing the effect.
+     */
+    public void cancel() {
+        if (task != null) {
+            task.cancel();
+            task = null;
+        }
     }
 
     @Override
