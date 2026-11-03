@@ -7,9 +7,9 @@ import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.logger.BetonQuestLoggerFactory;
 import org.betonquest.betonquest.logger.BetonQuestLogRecord;
 import org.betonquest.betonquest.logger.format.ChatFormatter;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.betonquest.betonquest.web.downloader.DownloadFailedException;
 import org.betonquest.betonquest.web.downloader.Downloader;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -124,7 +124,7 @@ public class DownloadSubCommand extends QuestCommandPart {
         final Downloader downloader = new Downloader(loggerFactory.create(Downloader.class, "Downloader"),
                 plugin.getDataFolder(), githubNamespace, ref, offsetPath, sourcePath, targetPath, recursive, overwrite);
         sendMessage(sender, "download_scheduled");
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Scheduling.runAsync(plugin, () -> {
             try {
                 downloader.call();
                 sendMessageSync(sender, "download_success");
@@ -149,7 +149,11 @@ public class DownloadSubCommand extends QuestCommandPart {
     }
 
     private void sendMessageSync(final CommandSender sender, final String messageName, final VariableReplacement... replacements) {
-        Bukkit.getScheduler().runTask(plugin, () -> sendMessage(sender, messageName, replacements));
+        if (sender instanceof final Player player) {
+            Scheduling.runForEntity(plugin, player, () -> sendMessage(sender, messageName, replacements));
+        } else {
+            Scheduling.runGlobal(plugin, () -> sendMessage(sender, messageName, replacements));
+        }
     }
 
     @Override

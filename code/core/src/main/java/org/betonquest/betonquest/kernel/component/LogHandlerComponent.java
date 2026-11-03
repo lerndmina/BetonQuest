@@ -10,7 +10,6 @@ import org.betonquest.betonquest.logger.handler.chat.ChatHandler;
 import org.betonquest.betonquest.logger.handler.history.HistoryHandler;
 import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.io.File;
 import java.time.InstantSource;
@@ -32,8 +31,7 @@ public class LogHandlerComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, Server.class, BukkitScheduler.class,
-                BetonQuestLoggerFactory.class, FileConfigAccessor.class);
+        return Set.of(Plugin.class, Server.class, BetonQuestLoggerFactory.class, FileConfigAccessor.class);
     }
 
     @Override
@@ -45,12 +43,11 @@ public class LogHandlerComponent extends AbstractCoreComponent {
     protected void load(final DependencyProvider dependencyProvider) {
         final Plugin plugin = getDependency(Plugin.class);
         final Server server = getDependency(Server.class);
-        final BukkitScheduler scheduler = getDependency(BukkitScheduler.class);
         final BetonQuestLoggerFactory loggerFactory = getDependency(BetonQuestLoggerFactory.class);
         final FileConfigAccessor config = getDependency(FileConfigAccessor.class);
 
         final HistoryHandler debugHistoryHandler = HandlerFactory.createHistoryHandler(loggerFactory, plugin,
-                scheduler, config, new File(plugin.getDataFolder(), "/logs"), InstantSource.system());
+                config, new File(plugin.getDataFolder(), "/logs"), InstantSource.system());
         registerLogHandler(server, debugHistoryHandler);
 
         final AccumulatingReceiverSelector receiverSelector = new AccumulatingReceiverSelector();

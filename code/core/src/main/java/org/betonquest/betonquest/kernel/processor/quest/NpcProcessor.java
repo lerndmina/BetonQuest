@@ -33,7 +33,7 @@ import org.betonquest.betonquest.lib.profile.ProfileKeyMap;
 import org.betonquest.betonquest.quest.action.IngameNotificationSender;
 import org.betonquest.betonquest.quest.action.NotificationLevel;
 import org.betonquest.betonquest.quest.objective.interact.Interaction;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Stores Npcs and starts Npc conversations.
@@ -186,7 +187,7 @@ public class NpcProcessor extends TypedQuestProcessor<NpcIdentifier, NpcWrapper<
         this.localizations = localizations;
         this.convStarter = convStarter;
         this.conversationIdentifierFactory = conversationIdentifierFactory;
-        this.npcInteractionLimiter = new ProfileKeyMap<>(profileProvider);
+        this.npcInteractionLimiter = new ProfileKeyMap<>(profileProvider, new ConcurrentHashMap<>());
         this.actionManager = actionManager;
         this.conditionManager = conditionManager;
         this.configAccessor = configAccessor;
@@ -375,8 +376,8 @@ public class NpcProcessor extends TypedQuestProcessor<NpcIdentifier, NpcWrapper<
          */
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onPlayerJoin(final PlayerJoinEvent event) {
-            Bukkit.getScheduler().runTask(plugin, () ->
-                    npcHider.applyVisibility(profileProvider.getProfile(event.getPlayer())));
+            final Player player = event.getPlayer();
+            Scheduling.runForEntity(plugin, player, () -> npcHider.applyVisibility(profileProvider.getProfile(player)));
         }
 
         /**

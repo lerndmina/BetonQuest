@@ -34,7 +34,6 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.Map;
 
@@ -114,7 +113,6 @@ public class BetonQuest extends JavaPlugin {
         coreComponentLoader.init(JavaPlugin.class, this);
         coreComponentLoader.init(Server.class, getServer());
         coreComponentLoader.init(PluginManager.class, getServer().getPluginManager());
-        coreComponentLoader.init(BukkitScheduler.class, getServer().getScheduler());
         coreComponentLoader.init(PluginDescriptionFile.class, getDescription());
         coreComponentLoader.init(ServicesManager.class, getServer().getServicesManager());
     }

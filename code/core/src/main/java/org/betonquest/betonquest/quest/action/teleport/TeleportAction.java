@@ -1,10 +1,12 @@
 package org.betonquest.betonquest.quest.action.teleport;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.action.OnlineAction;
 import org.betonquest.betonquest.api.service.conversation.Conversations;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 
 /**
@@ -37,7 +39,7 @@ public class TeleportAction implements OnlineAction {
     public void execute(final OnlineProfile profile) throws QuestException {
         conversations.cancel(profile);
         final Location playerLocation = location.getValue(profile);
-        profile.getPlayer().teleport(playerLocation);
+        Scheduling.teleport(BetonQuest.getInstance(), profile.getPlayer(), playerLocation);
     }
 
     @Override

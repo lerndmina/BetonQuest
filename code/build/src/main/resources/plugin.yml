@@ -2,6 +2,7 @@ name: ${plugin.name}
 main: ${plugin.main}
 version: ${plugin.version}
 api-version: ${plugin.api-version}
+folia-supported: true
 description: ${plugin.description}
 website: ${project.organization.url}
 author: ${project.organization.name}

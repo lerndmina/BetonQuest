@@ -24,6 +24,7 @@
     <excludedPitestGroups>ConfigurationSection</excludedPitestGroups>
 
     <betonquest.lib.version>3.3.0${changelist}</betonquest.lib.version>
+    <betonquest.scheduler.version>3.3.0${changelist}</betonquest.scheduler.version>
 
     <paper-api.version>1.18.2-R0.1-SNAPSHOT</paper-api.version>
     <bstats-bukkit.version>3.0.2</bstats-bukkit.version>
@@ -40,6 +41,11 @@
       <groupId>org.betonquest.betonquest</groupId>
       <artifactId>lib</artifactId>
       <version>${betonquest.lib.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.betonquest.betonquest</groupId>
+      <artifactId>scheduler</artifactId>
+      <version>${betonquest.scheduler.version}</version>
     </dependency>
 
     <!-- from papermc repository -->

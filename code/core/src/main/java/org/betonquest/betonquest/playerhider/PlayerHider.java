@@ -11,17 +11,20 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.api.service.instruction.Instructions;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The {@link PlayerHider} can hide others, if both the source and the target {@link Profile} meet all conditions.
@@ -58,7 +61,7 @@ public class PlayerHider {
      * The running hider.
      */
     @Nullable
-    private BukkitTask bukkitTask;
+    private TaskHandle bukkitTask;
 
     /**
      * Initialize and start a new {@link PlayerHider}.
@@ -106,16 +109,14 @@ public class PlayerHider {
     /**
      * Starts the {@link PlayerHider}.
      *
-     * @param scheduler the scheduler to use
-     * @param config    the config accessor
+     * @param config the config accessor
      */
-    @SuppressWarnings("PMD.LambdaCanBeMethodReference")
-    public void start(final BukkitScheduler scheduler, final ConfigAccessor config) {
+    public void start(final ConfigAccessor config) {
         final long updateInterval = config.getLong("hider.player_update_interval", 20);
         if (updateInterval <= 0) {
             return;
         }
-        bukkitTask = scheduler.runTaskTimer(plugin, () -> updateVisibility(), 1, updateInterval);
+        bukkitTask = Scheduling.runGlobalTimer(plugin, task -> updateVisibility(), 1, updateInterval);
     }
 
     /**
@@ -146,11 +147,8 @@ public class PlayerHider {
      * Trigger an update for the visibility.
      */
     public void updateVisibility() {
-        final Collection<? extends OnlineProfile> onlineProfiles = profileProvider.getOnlineProfiles();
-        final Map<OnlineProfile, List<OnlineProfile>> profilesToHide = getProfilesToHide(onlineProfiles, onlineProfiles);
-        for (final OnlineProfile source : onlineProfiles) {
-            updateVisibilityForProfiles(onlineProfiles, source, profilesToHide.get(source));
-        }
+        final List<OnlineProfile> onlineProfiles = List.copyOf(profileProvider.getOnlineProfiles());
+        updateVisibility(onlineProfiles, onlineProfiles);
     }
 
     /**
@@ -159,9 +157,45 @@ public class PlayerHider {
      * @param profile the profile to update the visibility for
      */
     public void updateVisibility(final OnlineProfile profile) {
-        final Collection<? extends OnlineProfile> onlineProfiles = profileProvider.getOnlineProfiles();
-        final Map<OnlineProfile, List<OnlineProfile>> profilesToHide = getProfilesToHide(onlineProfiles, List.of(profile));
-        updateVisibilityForProfiles(onlineProfiles, profile, profilesToHide.get(profile));
+        updateVisibility(List.copyOf(profileProvider.getOnlineProfiles()), List.of(profile));
+    }
+
+    /**
+     * Checks the hider conditions of every profile on the thread owning its player, then applies the visibility
+     * for each source on the thread owning the source.
+     * On Paper everything runs directly on the main thread.
+     *
+     * @param targets the profiles that may be hidden
+     * @param sources the profiles whose view is updated
+     */
+    private void updateVisibility(final List<OnlineProfile> targets, final List<OnlineProfile> sources) {
+        final List<Map.Entry<Collection<ConditionIdentifier>, Collection<ConditionIdentifier>>> hiderList = List.copyOf(hiders.entrySet());
+        final Set<OnlineProfile> targetSet = Set.copyOf(targets);
+        final Set<OnlineProfile> sourceSet = Set.copyOf(sources);
+        final Set<OnlineProfile> involved = new LinkedHashSet<>(targets);
+        involved.addAll(sources);
+        ProfileThreads.supplyEach(plugin, involved,
+                        profile -> checkHiders(profile, hiderList, targetSet.contains(profile), sourceSet.contains(profile)))
+                .thenAccept(matches -> {
+                    final Map<OnlineProfile, List<OnlineProfile>> profilesToHide = getProfilesToHide(hiderList, matches, targets, sources);
+                    for (final OnlineProfile source : sources) {
+                        final List<OnlineProfile> toHide = profilesToHide.get(source);
+                        Scheduling.executeForEntity(plugin, source.getPlayer(), () -> updateVisibilityForProfiles(targets, source, toHide));
+                    }
+                });
+    }
+
+    private HiderMatches checkHiders(final OnlineProfile profile,
+                                     final List<Map.Entry<Collection<ConditionIdentifier>, Collection<ConditionIdentifier>>> hiderList,
+                                     final boolean isTarget, final boolean isSource) {
+        final boolean[] asTarget = new boolean[hiderList.size()];
+        final boolean[] asSource = new boolean[hiderList.size()];
+        for (int i = 0; i < hiderList.size(); i++) {
+            final Map.Entry<Collection<ConditionIdentifier>, Collection<ConditionIdentifier>> hider = hiderList.get(i);
+            asTarget[i] = isTarget && conditionManager.testAll(profile, hider.getValue());
+            asSource[i] = isSource && conditionManager.testAll(profile, hider.getKey());
+        }
+        return new HiderMatches(asTarget, asSource);
     }
 
     private void updateVisibilityForProfiles(final Collection<? extends OnlineProfile> onlineProfiles, final OnlineProfile source,
@@ -181,18 +215,22 @@ public class PlayerHider {
         }
     }
 
-    private Map<OnlineProfile, List<OnlineProfile>> getProfilesToHide(final Collection<? extends OnlineProfile> targets,
-                                                                      final Collection<? extends OnlineProfile> sources) {
+    private Map<OnlineProfile, List<OnlineProfile>> getProfilesToHide(
+            final List<Map.Entry<Collection<ConditionIdentifier>, Collection<ConditionIdentifier>>> hiderList,
+            final Map<OnlineProfile, HiderMatches> matches, final List<OnlineProfile> targets, final List<OnlineProfile> sources) {
         final Map<OnlineProfile, List<OnlineProfile>> profilesToHide = new HashMap<>();
-        for (final Map.Entry<Collection<ConditionIdentifier>, Collection<ConditionIdentifier>> hider : hiders.entrySet()) {
+        for (int i = 0; i < hiderList.size(); i++) {
+            final int hider = i;
             final List<OnlineProfile> targetProfiles = new ArrayList<>();
             for (final OnlineProfile target : targets) {
-                if (conditionManager.testAll(target, hider.getValue())) {
+                final HiderMatches match = matches.get(target);
+                if (match != null && match.asTarget()[hider]) {
                     targetProfiles.add(target);
                 }
             }
             for (final OnlineProfile source : sources) {
-                if (!conditionManager.testAll(source, hider.getKey())) {
+                final HiderMatches match = matches.get(source);
+                if (match == null || !match.asSource()[hider]) {
                     continue;
                 }
                 final List<OnlineProfile> hiddenProfiles = getOrCreateProfileList(source, profilesToHide);
@@ -207,5 +245,15 @@ public class PlayerHider {
     private List<OnlineProfile> getOrCreateProfileList(final OnlineProfile onlineProfile, final Map<OnlineProfile, List<OnlineProfile>> profilesToHide) {
         final List<OnlineProfile> profiles = profilesToHide.get(onlineProfile);
         return profiles == null ? new ArrayList<>() : profiles;
+    }
+
+    /**
+     * Which hiders a profile matches, by index in the hider list.
+     *
+     * @param asTarget whether the profile meets the target conditions of each hider
+     * @param asSource whether the profile meets the source conditions of each hider
+     */
+    @SuppressWarnings("PMD.ArrayIsStoredDirectly")
+    private record HiderMatches(boolean[] asTarget, boolean[] asSource) {
     }
 }

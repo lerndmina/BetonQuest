@@ -2,10 +2,12 @@ package org.betonquest.betonquest.compatibility.itemsadder.action;
 
 import dev.lone.itemsadder.api.CustomBlock;
 import dev.lone.itemsadder.api.CustomStack;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.PlayerAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 
 /**
@@ -41,7 +43,7 @@ public class IASetBlockAction implements PlayerAction {
         if (!customStack.isBlock()) {
             throw new QuestException("ItemsAdder Item is not a block: " + itemID);
         }
-        CustomBlock.place(customStack.getNamespacedID(), loc);
+        Scheduling.runQuestAtLocation(BetonQuest.getInstance(), loc, () -> CustomBlock.place(customStack.getNamespacedID(), loc));
     }
 
     @Override

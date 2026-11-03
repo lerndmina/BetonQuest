@@ -15,6 +15,7 @@ import org.betonquest.betonquest.api.instruction.Instruction;
 import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.logger.BetonQuestLoggerFactory;
 import org.betonquest.betonquest.api.logger.QuestExceptionHandler;
+import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.quest.objective.ObjectiveState;
@@ -25,12 +26,14 @@ import org.betonquest.betonquest.kernel.processor.quest.ActionProcessor;
 import org.betonquest.betonquest.kernel.processor.quest.ConditionProcessor;
 import org.betonquest.betonquest.lib.logger.DefaultQuestExceptionHandler;
 import org.betonquest.betonquest.lib.profile.ProfileKeyMap;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of the {@link ObjectiveService}.
@@ -118,7 +121,7 @@ public class DefaultObjectiveService implements ObjectiveService {
         this.properties = new DefaultObjectiveProperties(this.logger);
         this.questExceptionHandler = new DefaultQuestExceptionHandler(objectiveID.getPackage(), this.logger, objectiveID.getFull());
         this.objectiveServiceData = parseObjectiveData(objectiveInstruction);
-        this.objectiveData = new ProfileKeyMap<>(profileProvider);
+        this.objectiveData = new ProfileKeyMap<>(profileProvider, new ConcurrentHashMap<>());
         this.defaultDataSupplier = profile -> "";
     }
 
@@ -163,7 +166,12 @@ public class DefaultObjectiveService implements ObjectiveService {
         saver.add(new Saver.Record(UpdateType.REMOVE_OBJECTIVES, profile.getProfileUUID().toString(), objectiveID.getFull()));
         saver.add(new Saver.Record(UpdateType.ADD_OBJECTIVES, profile.getProfileUUID().toString(), objectiveID.getFull(), freshData));
         final QuestDataUpdateEvent event = new QuestDataUpdateEvent(profile, objectiveID, freshData);
-        plugin.getServer().getScheduler().runTask(plugin, event::callEvent);
+        final Optional<OnlineProfile> online = profile.getOnlineProfile();
+        if (online.isPresent()) {
+            Scheduling.runForEntityOrGlobal(plugin, online.get().getPlayer(), event::callEvent);
+        } else {
+            Scheduling.runGlobal(plugin, event::callEvent);
+        }
         profile.getOnlineProfile()
                 .ifPresent(onlineProfile -> plugin.getPlayerDataStorage().get(onlineProfile).getJournal().update());
     }

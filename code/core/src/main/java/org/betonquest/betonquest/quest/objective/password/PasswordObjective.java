@@ -9,7 +9,7 @@ import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.api.service.action.ActionManager;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.jetbrains.annotations.Nullable;
@@ -103,7 +103,7 @@ public class PasswordObjective extends DefaultObjective {
         final String password = message.substring(prefix.length());
 
         if (regex.getValue(onlineProfile).matcher(password).matches()) {
-            Bukkit.getScheduler().runTask(BetonQuest.getInstance(), () -> getService().complete(onlineProfile));
+            Scheduling.runForEntity(BetonQuest.getInstance(), onlineProfile.getPlayer(), () -> getService().complete(onlineProfile));
             return !fromCommand || !prefix.isEmpty();
         }
         try {

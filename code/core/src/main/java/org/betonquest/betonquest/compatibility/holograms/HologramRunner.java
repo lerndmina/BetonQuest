@@ -1,10 +1,11 @@
 package org.betonquest.betonquest.compatibility.holograms;
 
 import org.betonquest.betonquest.api.profile.OnlineProfile;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -31,7 +32,7 @@ public final class HologramRunner {
      * Times the periodic execution of content and visibility refresh.
      */
     @Nullable
-    private BukkitTask task;
+    private TaskHandle task;
 
     /**
      * The empty default constructor.
@@ -62,15 +63,12 @@ public final class HologramRunner {
             final HologramRunner runner = entry.getValue();
             final int updateInterval = entry.getKey();
             if (updateInterval > 0) {
-                runner.task = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        for (final HologramWrapper hologramWrapper : runner.holograms) {
-                            hologramWrapper.updateContent();
-                            hologramWrapper.updateVisibility();
-                        }
+                runner.task = Scheduling.runGlobalTimer(plugin, scheduled -> {
+                    for (final HologramWrapper hologramWrapper : runner.holograms) {
+                        hologramWrapper.updateContent();
+                        hologramWrapper.updateVisibility();
                     }
-                }.runTaskTimer(plugin, 0, updateInterval);
+                }, 1, updateInterval);
             }
             for (final HologramWrapper hologram : runner.holograms) {
                 hologram.initialiseContent();

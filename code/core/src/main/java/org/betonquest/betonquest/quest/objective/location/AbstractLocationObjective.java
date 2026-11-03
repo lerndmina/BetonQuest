@@ -20,6 +20,7 @@ import org.bukkit.event.vehicle.VehicleMoveEvent;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -60,7 +61,7 @@ public abstract class AbstractLocationObjective extends DefaultObjective {
         super(service);
         this.entry = entry;
         this.exit = exit;
-        playersInsideRegion = new ProfileKeyMap<>(service.getProfileProvider());
+        playersInsideRegion = new ProfileKeyMap<>(service.getProfileProvider(), new ConcurrentHashMap<>());
     }
 
     /**

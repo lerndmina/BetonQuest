@@ -8,11 +8,11 @@ import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.conversation.Conversation;
 import org.betonquest.betonquest.conversation.ConversationColors;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -99,18 +99,15 @@ public class SlowTellrawConvIO extends TellrawConvIO {
         linesToPrint.addAll(new ArrayList<>(componentLineWrapper.splitWidth(colors.getText()
                 .append(colors.getNpc().append(npcName)).append(Component.text(": ")).append(npcText))));
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (linesToPrint.isEmpty()) {
-                    displayText();
-                    canReply = true;
-                    this.cancel();
-                    return;
-                }
-                conv.sendMessage(linesToPrint.remove(0));
+        Scheduling.runForEntityTimer(plugin, onlineProfile.getPlayer(), task -> {
+            if (linesToPrint.isEmpty()) {
+                displayText();
+                canReply = true;
+                task.cancel();
+                return;
             }
-        }.runTaskTimer(plugin, 0, messageDelay);
+            conv.sendMessage(linesToPrint.remove(0));
+        }, () -> canReply = true, 1, messageDelay);
     }
 
     @Override
@@ -118,15 +115,12 @@ public class SlowTellrawConvIO extends TellrawConvIO {
         if (canReply) {
             super.end(callback);
         } else {
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    if (canReply) {
-                        SlowTellrawConvIO.super.end(callback);
-                        this.cancel();
-                    }
+            Scheduling.runGlobalTimer(plugin, task -> {
+                if (canReply) {
+                    SlowTellrawConvIO.super.end(callback);
+                    task.cancel();
                 }
-            }.runTaskTimer(plugin, 1, 1);
+            }, 1, 1);
         }
     }
 }

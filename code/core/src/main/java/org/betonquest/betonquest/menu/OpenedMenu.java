@@ -8,6 +8,7 @@ import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.menu.event.MenuClickEvent;
 import org.betonquest.betonquest.menu.event.MenuCloseEvent;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -240,7 +241,7 @@ public class OpenedMenu implements Listener {
             case SHIFT_LEFT:
             case LEFT:
             case MIDDLE:
-                Bukkit.getServer().getScheduler().runTask(bukkitManager.plugin(), () -> clickLogic(event, item));
+                Scheduling.runForEntity(bukkitManager.plugin(), onlineProfile.getPlayer(), () -> clickLogic(event, item));
                 break;
             default:
                 break;

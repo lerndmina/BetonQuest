@@ -88,7 +88,6 @@ import org.betonquest.betonquest.quest.action.weather.WeatherActionFactory;
 import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.time.InstantSource;
 import java.util.Set;
@@ -108,8 +107,7 @@ public class ActionTypesComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, PluginManager.class, Server.class, BukkitScheduler.class,
-                BetonQuestLoggerFactory.class, ProfileProvider.class, PlayerDataStorage.class, GlobalData.class,
+        return Set.of(Plugin.class, PluginManager.class, Server.class, BetonQuestLoggerFactory.class, ProfileProvider.class, PlayerDataStorage.class, GlobalData.class,
                 Localizations.class, LanguageProvider.class, Saver.class, TextParser.class, Instructions.class,
                 Persistence.class, ActionTypeRegistry.class, Conversations.class, ActionManager.class,
                 ConditionManager.class, ObjectiveManager.class, NpcManager.class, CompassManager.class,
@@ -130,7 +128,6 @@ public class ActionTypesComponent extends AbstractCoreComponent {
         final Plugin plugin = getDependency(Plugin.class);
         final Server server = getDependency(Server.class);
         final PluginManager pluginManager = getDependency(PluginManager.class);
-        final BukkitScheduler scheduler = getDependency(BukkitScheduler.class);
         final Conversations conversations = getDependency(Conversations.class);
         final Instructions instructions = getDependency(Instructions.class);
         final ActionTypeRegistry actionTypes = getDependency(ActionTypeRegistry.class);
@@ -161,7 +158,7 @@ public class ActionTypesComponent extends AbstractCoreComponent {
         actionTypes.registerCombined("drop", new DropActionFactory(profileProvider));
         actionTypes.register("effect", new EffectActionFactory());
         actionTypes.register("equip", new EquipActionFactory());
-        actionTypes.registerCombined("eval", new EvalActionFactory(instructions, actionTypes, scheduler, plugin));
+        actionTypes.registerCombined("eval", new EvalActionFactory(instructions, actionTypes, plugin));
         actionTypes.register("experience", new ExperienceActionFactory());
         actionTypes.registerCombined("explosion", new ExplosionActionFactory());
         actionTypes.registerCombined("folder", new FolderActionFactory(plugin, loggerFactory, pluginManager,

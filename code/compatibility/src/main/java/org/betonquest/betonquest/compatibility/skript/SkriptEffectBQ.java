@@ -12,9 +12,9 @@ import org.betonquest.betonquest.api.identifier.ActionIdentifier;
 import org.betonquest.betonquest.api.identifier.IdentifierFactory;
 import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -69,21 +69,23 @@ public class SkriptEffectBQ extends Effect {
 
     @Override
     protected void execute(final Event event) {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                final String actionID = SkriptEffectBQ.this.action.getSingle(event);
-                try {
-                    final ProfileProvider profileProvider = betonQuestApi.profiles();
-                    final IdentifierFactory<ActionIdentifier> actionIdentifierFactory =
-                            betonQuestApi.identifiers().getFactory(ActionIdentifier.class);
-                    final Player single = player.getSingle(event);
-                    betonQuestApi.actions().manager().run(single == null ? null : profileProvider.getProfile(single),
-                            actionIdentifierFactory.parseIdentifier(null, actionID));
-                } catch (final QuestException e) {
-                    log.warn("Error when running Skript event - could not load '" + actionID + "' action: " + e.getMessage(), e);
-                }
+        final String actionID = this.action.getSingle(event);
+        final Player single = player.getSingle(event);
+        final Runnable fire = () -> {
+            try {
+                final ProfileProvider profileProvider = betonQuestApi.profiles();
+                final IdentifierFactory<ActionIdentifier> actionIdentifierFactory =
+                        betonQuestApi.identifiers().getFactory(ActionIdentifier.class);
+                betonQuestApi.actions().manager().run(single == null ? null : profileProvider.getProfile(single),
+                        actionIdentifierFactory.parseIdentifier(null, actionID));
+            } catch (final QuestException e) {
+                log.warn("Error when running Skript event - could not load '" + actionID + "' action: " + e.getMessage(), e);
             }
-        }.runTask(BetonQuest.getInstance());
+        };
+        if (single == null) {
+            Scheduling.runGlobal(BetonQuest.getInstance(), fire);
+        } else {
+            Scheduling.runForEntityOrGlobal(BetonQuest.getInstance(), single, fire);
+        }
     }
 }

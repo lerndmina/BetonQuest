@@ -17,7 +17,6 @@ import org.betonquest.betonquest.kernel.processor.quest.ConditionProcessor;
 import org.betonquest.betonquest.kernel.registry.quest.ActionTypeRegistry;
 import org.betonquest.betonquest.lib.dependency.component.AbstractCoreComponent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.Set;
 
@@ -35,8 +34,7 @@ public class ActionsComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, BukkitScheduler.class,
-                QuestPackageManager.class, BetonQuestLoggerFactory.class,
+        return Set.of(Plugin.class, QuestPackageManager.class, BetonQuestLoggerFactory.class,
                 Identifiers.class, ConditionProcessor.class, Instructions.class, ProcessorDataLoader.class, ConditionManager.class);
     }
 
@@ -50,7 +48,6 @@ public class ActionsComponent extends AbstractCoreComponent {
         final QuestPackageManager questPackageManager = getDependency(QuestPackageManager.class);
         final BetonQuestLoggerFactory loggerFactory = getDependency(BetonQuestLoggerFactory.class);
         final Identifiers identifiers = getDependency(Identifiers.class);
-        final BukkitScheduler bukkitScheduler = getDependency(BukkitScheduler.class);
         final ConditionProcessor conditionProcessor = getDependency(ConditionProcessor.class);
         final Instructions instructions = getDependency(Instructions.class);
         final Plugin plugin = getDependency(Plugin.class);
@@ -61,7 +58,7 @@ public class ActionsComponent extends AbstractCoreComponent {
         identifiers.register(ActionIdentifier.class, actionIdentifierFactory);
         final ActionTypeRegistry actionTypeRegistry = new ActionTypeRegistry(loggerFactory.create(ActionTypeRegistry.class), loggerFactory, conditionProcessor);
         final ActionProcessor actionProcessor = new ActionProcessor(loggerFactory.create(ActionProcessor.class),
-                actionIdentifierFactory, actionTypeRegistry, bukkitScheduler, instructions, plugin, conditionManager);
+                actionIdentifierFactory, actionTypeRegistry, instructions, plugin, conditionManager);
 
         dependencyProvider.take(ActionIdentifierFactory.class, actionIdentifierFactory);
         dependencyProvider.take(ActionTypeRegistry.class, actionTypeRegistry);

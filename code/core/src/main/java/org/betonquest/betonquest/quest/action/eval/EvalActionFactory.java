@@ -10,7 +10,6 @@ import org.betonquest.betonquest.api.quest.action.PlayerlessActionFactory;
 import org.betonquest.betonquest.api.service.instruction.Instructions;
 import org.betonquest.betonquest.kernel.registry.quest.ActionTypeRegistry;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 /**
  * A factory for creating Eval actions.
@@ -28,11 +27,6 @@ public class EvalActionFactory implements PlayerActionFactory, PlayerlessActionF
     private final ActionTypeRegistry actionTypeRegistry;
 
     /**
-     * The scheduler to use for synchronous execution.
-     */
-    private final BukkitScheduler scheduler;
-
-    /**
      * The plugin instance.
      */
     private final Plugin plugin;
@@ -42,13 +36,11 @@ public class EvalActionFactory implements PlayerActionFactory, PlayerlessActionF
      *
      * @param instructions       the BetonQuest instructions to use to parse instructions
      * @param actionTypeRegistry the action type registry providing factories to parse the evaluated instruction
-     * @param scheduler          the scheduler to use for synchronous execution
      * @param plugin             the plugin instance
      */
-    public EvalActionFactory(final Instructions instructions, final ActionTypeRegistry actionTypeRegistry, final BukkitScheduler scheduler, final Plugin plugin) {
+    public EvalActionFactory(final Instructions instructions, final ActionTypeRegistry actionTypeRegistry, final Plugin plugin) {
         this.instructions = instructions;
         this.actionTypeRegistry = actionTypeRegistry;
-        this.scheduler = scheduler;
         this.plugin = plugin;
     }
 
@@ -65,6 +57,6 @@ public class EvalActionFactory implements PlayerActionFactory, PlayerlessActionF
     private NullableActionAdapter parseEvalAction(final Instruction instruction) throws QuestException {
         final String rawInstruction = String.join(" ", instruction.getValueParts());
         return new NullableActionAdapter(new EvalAction(instructions, actionTypeRegistry, instruction.getPackage(),
-                instruction.chainForArgument(rawInstruction).string().get(), scheduler, plugin));
+                instruction.chainForArgument(rawInstruction).string().get(), plugin));
     }
 }

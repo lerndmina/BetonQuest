@@ -10,6 +10,7 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.lib.profile.ProfileValueMap;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.block.BrewingStand;
 import org.bukkit.event.inventory.BrewEvent;
@@ -18,12 +19,12 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -61,7 +62,7 @@ public class BrewObjective extends CountingObjective {
         super(service, targetAmount, "objective.potions_to_brew");
         this.plugin = plugin;
         this.potion = potion;
-        this.locations = new ProfileValueMap<>(profileProvider);
+        this.locations = new ProfileValueMap<>(profileProvider, new ConcurrentHashMap<>());
     }
 
     /**
@@ -77,18 +78,15 @@ public class BrewObjective extends CountingObjective {
         }
 
         final ItemStack[] contentBefore = topInventory.getContents();
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                final ItemStack[] contentAfter = topInventory.getContents();
-                if (itemsAdded(contentBefore, contentAfter)) {
-                    final BrewingStand brewingStand = (BrewingStand) topInventory.getHolder();
-                    if (brewingStand != null) {
-                        locations.put(brewingStand.getLocation(), onlineProfile);
-                    }
+        Scheduling.runForEntity(plugin, onlineProfile.getPlayer(), () -> {
+            final ItemStack[] contentAfter = topInventory.getContents();
+            if (itemsAdded(contentBefore, contentAfter)) {
+                final BrewingStand brewingStand = (BrewingStand) topInventory.getHolder();
+                if (brewingStand != null) {
+                    locations.put(brewingStand.getLocation(), onlineProfile);
                 }
             }
-        }.runTask(plugin);
+        });
     }
 
     @SuppressWarnings("PMD.UseVarargs")

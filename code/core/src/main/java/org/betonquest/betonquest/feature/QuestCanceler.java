@@ -1,6 +1,7 @@
 package org.betonquest.betonquest.feature;
 
 import net.kyori.adventure.text.Component;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.common.component.VariableReplacement;
 import org.betonquest.betonquest.api.config.Localizations;
@@ -26,6 +27,7 @@ import org.betonquest.betonquest.database.PlayerData;
 import org.betonquest.betonquest.feature.journal.Journal;
 import org.betonquest.betonquest.quest.action.IngameNotificationSender;
 import org.betonquest.betonquest.quest.action.NotificationLevel;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -228,7 +230,7 @@ public class QuestCanceler {
         }
         try {
             log.debug(pack, "  Teleporting to new location");
-            onlineProfile.getPlayer().teleport(data.location.getValue(onlineProfile));
+            Scheduling.teleport(BetonQuest.getInstance(), onlineProfile.getPlayer(), data.location.getValue(onlineProfile));
         } catch (final QuestException e) {
             log.warn(pack, "Could not teleport to " + data.location, e);
         }

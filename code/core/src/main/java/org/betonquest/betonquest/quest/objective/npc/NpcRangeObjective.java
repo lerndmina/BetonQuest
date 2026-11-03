@@ -3,7 +3,6 @@ package org.betonquest.betonquest.quest.objective.npc;
 import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.DefaultObjective;
 import org.betonquest.betonquest.api.QuestException;
-import org.betonquest.betonquest.api.QuestListException;
 import org.betonquest.betonquest.api.common.function.QuestBiPredicate;
 import org.betonquest.betonquest.api.identifier.NpcIdentifier;
 import org.betonquest.betonquest.api.instruction.Argument;
@@ -13,15 +12,16 @@ import org.betonquest.betonquest.api.quest.npc.Npc;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.api.service.npc.NpcManager;
 import org.betonquest.betonquest.lib.profile.ProfileKeyMap;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.Location;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The player has to reach a certain radius around a specified Npc.
@@ -54,9 +54,9 @@ public class NpcRangeObjective extends DefaultObjective {
     private final Map<Profile, Boolean> playersInRange;
 
     /**
-     * BukkitTask ID to stop range check loop.
+     * Task running the range check loop.
      */
-    private final int npcMoveTask;
+    private final TaskHandle npcMoveTask;
 
     /**
      * Creates a new NPCRangeObjective from the given instruction.
@@ -74,9 +74,8 @@ public class NpcRangeObjective extends DefaultObjective {
         this.npcIds = npcIds;
         this.radius = radius;
         this.checkStuff = getStuff(trigger);
-        this.playersInRange = new ProfileKeyMap<>(service.getProfileProvider());
-        this.npcMoveTask = Bukkit.getScheduler().scheduleSyncRepeatingTask(BetonQuest.getInstance(),
-                () -> getExceptionHandler().handle(this::loop), 0, 20);
+        this.playersInRange = new ProfileKeyMap<>(service.getProfileProvider(), new ConcurrentHashMap<>());
+        this.npcMoveTask = Scheduling.runGlobalTimer(BetonQuest.getInstance(), task -> loop(), 1, 20);
     }
 
     @SuppressWarnings("PMD.CognitiveComplexity")
@@ -113,34 +112,27 @@ public class NpcRangeObjective extends DefaultObjective {
 
     @Override
     public void close() {
-        Bukkit.getScheduler().cancelTask(npcMoveTask);
+        npcMoveTask.cancel();
         super.close();
     }
 
-    private void loop() throws QuestException {
-        final List<UUID> profilesInside = new ArrayList<>();
+    private void loop() {
         final List<OnlineProfile> profiles = getService().getData().keySet().stream()
                 .map(Profile::getOnlineProfile)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .toList();
-        final QuestListException questListException = new QuestListException("Could not loop all online profiles:");
-        for (final OnlineProfile onlineProfile : profiles) {
-            try {
-                for (final NpcIdentifier npcId : npcIds.getValue(onlineProfile)) {
-                    if (isInRange(onlineProfile, npcId)) {
-                        profilesInside.add(onlineProfile.getProfileUUID());
-                        break;
-                    }
-                }
-            } catch (final QuestException e) {
-                questListException.addException(onlineProfile.toString(), e);
+        ProfileThreads.forEach(BetonQuest.getInstance(), profiles,
+                onlineProfile -> getExceptionHandler().handle(() -> checkPlayer(onlineProfile, isInRange(onlineProfile))));
+    }
+
+    private boolean isInRange(final OnlineProfile onlineProfile) throws QuestException {
+        for (final NpcIdentifier npcId : npcIds.getValue(onlineProfile)) {
+            if (isInRange(onlineProfile, npcId)) {
+                return true;
             }
         }
-        for (final OnlineProfile onlineProfile : profiles) {
-            checkPlayer(onlineProfile, profilesInside.contains(onlineProfile.getProfileUUID()));
-        }
-        questListException.throwIfNotEmpty();
+        return false;
     }
 
     private boolean isInRange(final OnlineProfile onlineProfile, final NpcIdentifier npcId)

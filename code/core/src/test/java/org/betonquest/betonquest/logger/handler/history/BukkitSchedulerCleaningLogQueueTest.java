@@ -47,7 +47,7 @@ class BukkitSchedulerCleaningLogQueueTest {
     void testSchedulerClearsOldRecords() {
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
             final BukkitSchedulerCleaningLogQueue logQueue = new BukkitSchedulerCleaningLogQueue(nowSource, validFor);
-            logQueue.runCleanupTimerAsynchronously(scheduler, plugin, 20, 20);
+            scheduler.runTaskTimerAsynchronously(plugin, logQueue::removeExpiredRecords, 20, 20);
             final LogRecord record = new LogRecord(Level.INFO, "old log record");
             record.setInstant(now.minus(validFor).minus(1, ChronoUnit.MINUTES));
             logQueue.push(record);
@@ -61,7 +61,7 @@ class BukkitSchedulerCleaningLogQueueTest {
     void testSchedulerKeepsRecentRecords() {
         try (BukkitSchedulerMock scheduler = new BukkitSchedulerMock()) {
             final BukkitSchedulerCleaningLogQueue logQueue = new BukkitSchedulerCleaningLogQueue(nowSource, validFor);
-            logQueue.runCleanupTimerAsynchronously(scheduler, plugin, 20, 20);
+            scheduler.runTaskTimerAsynchronously(plugin, logQueue::removeExpiredRecords, 20, 20);
             final LogRecord record = new LogRecord(Level.INFO, "recent log record");
             record.setInstant(now.minus(validFor));
             logQueue.push(record);

@@ -1,10 +1,12 @@
 package org.betonquest.betonquest.quest.action.time;
 
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.QuestException;
 import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.instruction.FlagArgument;
 import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.action.NullableAction;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,6 +45,10 @@ public class TimeAction implements NullableAction {
 
     @Override
     public void execute(@Nullable final Profile profile) throws QuestException {
+        Scheduling.runQuestGlobal(BetonQuest.getInstance(), () -> executeGlobal(profile));
+    }
+
+    private void executeGlobal(@Nullable final Profile profile) throws QuestException {
         final World world = this.world.getValue(profile);
         final TimeChange change = timeChange.getValue(profile);
         change.applyTo(world, !tickFormat.getValue(profile).orElse(false));

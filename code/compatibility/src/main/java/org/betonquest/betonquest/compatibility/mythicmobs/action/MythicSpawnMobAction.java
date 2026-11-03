@@ -11,7 +11,7 @@ import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.action.OnlineAction;
 import org.betonquest.betonquest.api.quest.action.PlayerlessAction;
 import org.betonquest.betonquest.compatibility.mythicmobs.MythicHider;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
@@ -21,6 +21,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Spawns MythicMobs mobs.
@@ -98,24 +99,29 @@ public class MythicSpawnMobAction implements OnlineAction, PlayerlessAction {
         final Map.Entry<MythicMob, Double> mobLevelValue = mobLevel.getValue(profile);
         final MythicMob mob = mobLevelValue.getKey();
         final double level = mobLevelValue.getValue();
-        final AbstractLocation abstractLocation = BukkitAdapter.adapt(loc.getValue(profile));
+        final Location location = loc.getValue(profile);
+        final AbstractLocation abstractLocation = BukkitAdapter.adapt(location);
         final String mark = marked == null ? null : marked.getValue(profile);
-        for (int i = 0; i < pAmount; i++) {
-            final ActiveMob targetMob = mob.spawn(abstractLocation, level);
-            if (targetMob == null) {
-                throw new QuestException("MythicMob '" + mob + "' could not spawn at '" + abstractLocation + "' !");
-            }
-            final Entity entity = targetMob.getEntity().getBukkitEntity();
+        final Optional<MythicHider> hider = this.mythicHider.getValue(profile);
+        final boolean target = targetPlayer.getValue(profile).orElse(false);
+        Scheduling.runQuestAtLocation(plugin, location, () -> {
+            for (int i = 0; i < pAmount; i++) {
+                final ActiveMob targetMob = mob.spawn(abstractLocation, level);
+                if (targetMob == null) {
+                    throw new QuestException("MythicMob '" + mob + "' could not spawn at '" + abstractLocation + "' !");
+                }
+                final Entity entity = targetMob.getEntity().getBukkitEntity();
 
-            this.mythicHider.getValue(profile).ifPresent(mythicHider ->
-                    Bukkit.getScheduler().runTaskLater(plugin, () -> mythicHider.applyVisibilityPrivate(profile, entity), 20L));
-            if (targetPlayer.getValue(profile).orElse(false)) {
-                Bukkit.getScheduler().runTaskLater(plugin, () -> targetMob.setTarget(BukkitAdapter.adapt(player)), 20L);
+                hider.ifPresent(mythicHider ->
+                        Scheduling.runGlobalLater(plugin, () -> mythicHider.applyVisibilityPrivate(profile, entity), 20L));
+                if (target) {
+                    Scheduling.runForEntityLater(plugin, entity, () -> targetMob.setTarget(BukkitAdapter.adapt(player)), 20L);
+                }
+                if (mark != null) {
+                    entity.getPersistentDataContainer().set(MARKED_KEY, PersistentDataType.STRING, mark);
+                }
             }
-            if (mark != null) {
-                entity.getPersistentDataContainer().set(MARKED_KEY, PersistentDataType.STRING, mark);
-            }
-        }
+        });
     }
 
     @Override

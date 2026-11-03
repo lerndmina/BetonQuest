@@ -12,7 +12,6 @@ import org.betonquest.betonquest.api.service.instruction.Instructions;
 import org.betonquest.betonquest.lib.dependency.component.AbstractCoreComponent;
 import org.betonquest.betonquest.playerhider.PlayerHider;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.util.Set;
 
@@ -30,8 +29,7 @@ public class PlayerHiderComponent extends AbstractCoreComponent {
 
     @Override
     public Set<Class<?>> requires() {
-        return Set.of(Plugin.class, BukkitScheduler.class,
-                ConfigAccessor.class, QuestPackageManager.class, ProfileProvider.class, BetonQuestLoggerFactory.class,
+        return Set.of(Plugin.class, ConfigAccessor.class, QuestPackageManager.class, ProfileProvider.class, BetonQuestLoggerFactory.class,
                 Instructions.class, ConditionManager.class, Reloader.class);
     }
 
@@ -43,7 +41,6 @@ public class PlayerHiderComponent extends AbstractCoreComponent {
     @Override
     protected void load(final DependencyProvider dependencyProvider) {
         final Plugin plugin = getDependency(Plugin.class);
-        final BukkitScheduler bukkitScheduler = getDependency(BukkitScheduler.class);
         final ConfigAccessor config = getDependency(ConfigAccessor.class);
         final BetonQuestLoggerFactory loggerFactory = getDependency(BetonQuestLoggerFactory.class);
         final QuestPackageManager packManager = getDependency(QuestPackageManager.class);
@@ -58,7 +55,7 @@ public class PlayerHiderComponent extends AbstractCoreComponent {
         reloader.register(ReloadPhase.PROFILES, () -> {
             playerHider.stop();
             playerHider.load(packManager, instructions);
-            playerHider.start(bukkitScheduler, config);
+            playerHider.start(config);
         });
     }
 }

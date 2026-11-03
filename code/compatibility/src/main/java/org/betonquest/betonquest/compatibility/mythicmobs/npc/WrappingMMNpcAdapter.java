@@ -4,9 +4,11 @@ import io.lumine.mythic.api.exceptions.InvalidMobTypeException;
 import io.lumine.mythic.api.mobs.MythicMob;
 import io.lumine.mythic.bukkit.BukkitAPIHelper;
 import io.lumine.mythic.core.mobs.ActiveMob;
+import org.betonquest.betonquest.BetonQuest;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.quest.npc.Npc;
 import org.betonquest.betonquest.compatibility.mythicmobs.MythicHider;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +34,7 @@ public class WrappingMMNpcAdapter implements Npc<ActiveMob> {
      * Spawned Mob instance.
      */
     @Nullable
-    private Npc<ActiveMob> spawned;
+    private volatile Npc<ActiveMob> spawned;
 
     /**
      * Creates a new empty Adapter with a Mob Type.
@@ -90,6 +92,18 @@ public class WrappingMMNpcAdapter implements Npc<ActiveMob> {
     @Override
     public void spawn(final Location location) {
         if (spawned == null || !spawned.isSpawned()) {
+            Scheduling.executeAtLocation(BetonQuest.getInstance(), location, () -> spawnInRegion(location));
+        }
+    }
+
+    /**
+     * Spawns the mob on the thread owning the location, unless another call spawned it in the meantime.
+     *
+     * @param location the location to spawn at
+     */
+    private void spawnInRegion(final Location location) {
+        final Npc<ActiveMob> current = spawned;
+        if (current == null || !current.isSpawned()) {
             final BukkitAPIHelper apiHelper = new BukkitAPIHelper();
             final Entity entity;
             try {

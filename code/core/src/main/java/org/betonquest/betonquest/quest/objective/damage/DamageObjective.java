@@ -9,7 +9,7 @@ import org.betonquest.betonquest.api.profile.Profile;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveProperties;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.lib.argument.type.TimeUnit;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.plugin.Plugin;
@@ -162,7 +162,7 @@ public class DamageObjective extends DefaultObjective {
         final TimeUnit unit = timeUnit.getValue(profile);
         final long requiredInterval = unit.getTicks(rawAmount);
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> selectionCooldowns.remove(player), requiredInterval);
+        Scheduling.runGlobalLater(plugin, () -> selectionCooldowns.remove(player), requiredInterval);
         return false;
     }
 

@@ -14,9 +14,8 @@ import org.betonquest.betonquest.kernel.processor.TypedQuestProcessor;
 import org.betonquest.betonquest.kernel.processor.adapter.ConditionAdapter;
 import org.betonquest.betonquest.kernel.registry.quest.ConditionTypeRegistry;
 import org.betonquest.betonquest.quest.condition.logik.ConjunctionCondition;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.ProfileThreads;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -34,13 +33,7 @@ import java.util.stream.Stream;
 /**
  * Does the logic around Conditions.
  */
-@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier, ConditionAdapter> implements ConditionManager {
-
-    /**
-     * The Bukkit scheduler to run sync tasks.
-     */
-    private final BukkitScheduler scheduler;
 
     /**
      * The plugin instance.
@@ -57,17 +50,15 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
      *
      * @param log                        the custom logger for this class
      * @param conditionTypes             the available condition types
-     * @param scheduler                  the bukkit scheduler to run sync tasks
      * @param conditionIdentifierFactory the factory to create condition identifiers
      * @param plugin                     the plugin instance
      * @param instructionApi             the instruction api
      */
     public ConditionProcessor(final BetonQuestLogger log,
-                              final ConditionTypeRegistry conditionTypes, final BukkitScheduler scheduler,
+                              final ConditionTypeRegistry conditionTypes,
                               final IdentifierFactory<ConditionIdentifier> conditionIdentifierFactory, final Plugin plugin,
                               final Instructions instructionApi) {
         super(log, conditionTypes, conditionIdentifierFactory, instructionApi, "Condition", "conditions");
-        this.scheduler = scheduler;
         this.plugin = plugin;
         this.sectionFactory = identifier -> {
             final List<ConditionIdentifier> identifiers = IdentifierUtil.subsectionIdentifiers(identifierFactory, identifier);
@@ -95,7 +86,7 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
                 ? stream -> stream.allMatch(id -> test(profile, id))
                 : stream -> stream.anyMatch(id -> test(profile, id));
 
-        if (Bukkit.isPrimaryThread()) {
+        if (ProfileThreads.isServerThread()) {
             return allOrAnyMatch.apply(conditionIDs.stream());
         }
 
@@ -108,7 +99,7 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
         });
 
         final Future<Boolean> syncFuture = syncList.isEmpty() ? CompletableFuture.completedFuture(matchAll)
-                : scheduler.callSyncMethod(plugin, () -> allOrAnyMatch.apply(syncList.stream()));
+                : ProfileThreads.supply(plugin, profile, () -> allOrAnyMatch.apply(syncList.stream()));
         final boolean asyncResult = allOrAnyMatch.apply(asyncList.stream());
 
         try {
@@ -141,7 +132,7 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
                     "Cannot check player-dependent condition '%s' without a player, returning false".formatted(conditionID));
             return false;
         }
-        if (condition.isPrimaryThreadEnforced() && !Bukkit.isPrimaryThread()) {
+        if (condition.isPrimaryThreadEnforced() && !ProfileThreads.isServerThread()) {
             return checkOutcomeSync(profile, conditionID, condition);
         }
         return checkOutcome(profile, conditionID, condition);
@@ -149,19 +140,36 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
 
     private boolean checkOutcomeSync(@Nullable final Profile profile, final ConditionIdentifier conditionID, final ConditionAdapter condition) {
         try {
-            return scheduler.callSyncMethod(plugin, () -> checkOutcome(profile, conditionID, condition)).get();
+            return ProfileThreads.supply(plugin, profile, () -> checkOutcome(profile, conditionID, condition)).get();
         } catch (final InterruptedException | ExecutionException e) {
             log.reportException(e);
             return false;
         }
     }
 
+    /**
+     * Checks the condition on the current thread.
+     * <p>
+     * Callers on a server thread are expected to call this for profiles that thread owns. A server thread can not
+     * wait for another one, so a check for a player owned by another region (Folia only) still runs here. If the
+     * condition then touches world state the server rejects that with an {@link IllegalStateException}; it is
+     * reported like a failed check instead of aborting the caller, for example a loop over all online players.
+     *
+     * @param profile     the profile to check for
+     * @param conditionID the condition id
+     * @param condition   the condition
+     * @return whether the condition is met
+     */
     private boolean checkOutcome(@Nullable final Profile profile, final ConditionIdentifier conditionID, final ConditionAdapter condition) {
         final boolean outcome;
         try {
             outcome = condition.check(profile);
         } catch (final QuestException e) {
             log.warn(conditionID.getPackage(), "Error while checking '" + conditionID + "' condition: " + e.getMessage(), e);
+            return false;
+        } catch (final IllegalStateException e) {
+            log.warn(conditionID.getPackage(), "Could not check '" + conditionID + "' condition for " + profile
+                    + " on thread '" + Thread.currentThread().getName() + "': " + e.getMessage(), e);
             return false;
         }
         final boolean isMet = outcome != conditionID.isInverted();
@@ -184,12 +192,12 @@ public class ConditionProcessor extends TypedQuestProcessor<ConditionIdentifier,
             }
             (adapter.isPrimaryThreadEnforced() ? sync : async).put(identifier, adapter);
         }
-        if (Bukkit.isPrimaryThread()) {
+        if (ProfileThreads.isServerThread()) {
             sync.putAll(async);
             return testStrategy(profile, sync, testStrategy, 0).result().orElse(false);
         }
         final Future<Result> syncFuture = sync.isEmpty() ? CompletableFuture.completedFuture(new Result(Optional.empty()))
-                : scheduler.callSyncMethod(plugin, () -> testStrategy(profile, sync, testStrategy, async.size()));
+                : ProfileThreads.supply(plugin, profile, () -> testStrategy(profile, sync, testStrategy, async.size()));
         final Result asyncResult = testStrategy(profile, async, testStrategy, sync.size());
 
         if (asyncResult.result().isPresent()) {

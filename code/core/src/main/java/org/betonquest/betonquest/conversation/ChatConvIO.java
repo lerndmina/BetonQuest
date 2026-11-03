@@ -6,6 +6,7 @@ import org.betonquest.betonquest.api.config.ConfigAccessor;
 import org.betonquest.betonquest.api.config.Localizations;
 import org.betonquest.betonquest.api.logger.BetonQuestLogger;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
@@ -16,7 +17,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
@@ -112,7 +112,7 @@ public abstract class ChatConvIO implements ConversationIO, Listener {
     private void moveBack(final PlayerMoveEvent event) {
         if (!event.getTo().getWorld().equals(conv.getCenter().getWorld()) || event.getTo()
                 .distance(conv.getCenter()) > maxNpcDistance * 2) {
-            event.getPlayer().teleport(conv.getCenter());
+            Scheduling.teleport(plugin, event.getPlayer(), conv.getCenter());
             return;
         }
         final float yaw = event.getTo().getYaw();
@@ -124,7 +124,7 @@ public abstract class ChatConvIO implements ConversationIO, Listener {
         newLocation.add(vector);
         newLocation.setPitch(pitch);
         newLocation.setYaw(yaw);
-        event.getPlayer().teleport(newLocation);
+        Scheduling.teleport(plugin, event.getPlayer(), newLocation);
         if (config.getBoolean("conversation.stop.notify")) {
             try {
                 conv.sendMessage(localizations.getMessage(onlineProfile, "pullback"));
@@ -159,12 +159,7 @@ public abstract class ChatConvIO implements ConversationIO, Listener {
         } catch (final NumberFormatException e) {
             log.debug("Invalid answer from player: " + message, e);
         }
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                display();
-            }
-        }.runTask(plugin);
+        Scheduling.runForEntity(plugin, onlineProfile.getPlayer(), this::display);
     }
 
     @Override

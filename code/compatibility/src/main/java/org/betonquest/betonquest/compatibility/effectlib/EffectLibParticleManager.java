@@ -98,7 +98,7 @@ public class EffectLibParticleManager extends SectionProcessor<ParticleIdentifie
         final EffectConfiguration configuration = new EffectConfiguration(effectClass, locations, npcs, conditions, instruction.getSection(), checkInterval);
         final EffectLibRunnable libRunnable = new EffectLibRunnable(loggerFactory.create(EffectLibRunnable.class),
                 profileProvider, manager, configuration, npcManager, conditionManager);
-        libRunnable.runTaskTimer(plugin, 1, interval.getValue(null).intValue());
+        libRunnable.start(plugin, 1, interval.getValue(null).intValue());
 
         return Map.entry(getIdentifier(instruction.getPackage(), sectionName), libRunnable);
     }

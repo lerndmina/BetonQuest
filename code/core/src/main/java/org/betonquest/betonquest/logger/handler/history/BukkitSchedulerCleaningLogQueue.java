@@ -1,8 +1,5 @@
 package org.betonquest.betonquest.logger.handler.history;
 
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
@@ -11,8 +8,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.LogRecord;
 
 /**
- * LogRecord Queue that cleans old records by using a {@link org.bukkit.scheduler.BukkitScheduler} to drop expired
- * records regularly.
+ * LogRecord Queue that drops expired records when {@link #removeExpiredRecords()} is called regularly.
  */
 public class BukkitSchedulerCleaningLogQueue extends QueueBackedLogRecordQueue {
 
@@ -27,8 +23,8 @@ public class BukkitSchedulerCleaningLogQueue extends QueueBackedLogRecordQueue {
     private final InstantSource instantSource;
 
     /**
-     * Create a log record queue cleaned by a bukkit scheduler. The scheduler will not be started until
-     * {@link #runCleanupTimerAsynchronously(BukkitScheduler, Plugin, long, long)} is called.
+     * Create a log record queue cleaned by a repeating task. Records are not dropped until
+     * {@link #removeExpiredRecords()} is called.
      *
      * @param instantSource instant source
      * @param validFor      duration that log records should be valid for
@@ -40,20 +36,13 @@ public class BukkitSchedulerCleaningLogQueue extends QueueBackedLogRecordQueue {
     }
 
     /**
-     * Start a new task that regularly removes old entries from the log queue.
-     *
-     * @param scheduler scheduler to run the task in
-     * @param plugin    plugin to schedule for
-     * @param delay     the ticks to wait before running the task for the first time
-     * @param period    the ticks to wait between runs
-     * @return a BukkitTask that contains the id number
+     * Removes the expired entries from the log queue.
+     * Meant to be called regularly from a repeating task, see {@link org.betonquest.betonquest.logger.HandlerFactory}.
      */
-    public BukkitTask runCleanupTimerAsynchronously(final BukkitScheduler scheduler, final Plugin plugin, final long delay, final long period) {
-        return scheduler.runTaskTimerAsynchronously(plugin, () -> {
-            while (isExpired(getRecordQueue().peek())) {
-                getRecordQueue().remove();
-            }
-        }, delay, period);
+    public void removeExpiredRecords() {
+        while (isExpired(getRecordQueue().peek())) {
+            getRecordQueue().remove();
+        }
     }
 
     private boolean isExpired(@Nullable final LogRecord record) {

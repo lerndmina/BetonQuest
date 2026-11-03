@@ -8,8 +8,9 @@ import org.betonquest.betonquest.api.instruction.Argument;
 import org.betonquest.betonquest.api.profile.OnlineProfile;
 import org.betonquest.betonquest.api.service.placeholder.PlaceholderManager;
 import org.betonquest.betonquest.notify.NotifyIO;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -125,38 +126,22 @@ public class BossBarNotifyIO extends NotifyIO {
     }
 
     private void scheduleRemoval(final BossBar bossBar, final OnlineProfile onlineProfile, final int stay) {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                onlineProfile.getPlayer().hideBossBar(bossBar);
-            }
-        }.runTaskLater(plugin, stay);
+        final Player player = onlineProfile.getPlayer();
+        Scheduling.runForEntityLater(plugin, player, () -> player.hideBossBar(bossBar), stay);
     }
 
     private void scheduleAnimation(final BossBar bossBar, final int interval, final float amount,
                                    final int startCountdown, final float startProgress) {
-        new BukkitRunnable() {
-            /**
-             * The current countdown value.
-             */
-            private int currentCountdown = startCountdown;
-
-            /**
-             * The current progress of the boss bar.
-             * Starts at the initial progress and decreases by the specified amount each tick.
-             */
-            private float currentProgress = startProgress;
-
-            @Override
-            public void run() {
-                if (currentCountdown == 0) {
-                    cancel();
-                    return;
-                }
-                currentCountdown -= 1;
-                currentProgress -= amount;
-                bossBar.progress(Math.max(0.0F, currentProgress));
+        final int[] currentCountdown = {startCountdown};
+        final float[] currentProgress = {startProgress};
+        Scheduling.runGlobalTimer(plugin, task -> {
+            if (currentCountdown[0] == 0) {
+                task.cancel();
+                return;
             }
-        }.runTaskTimer(plugin, interval, interval);
+            currentCountdown[0] -= 1;
+            currentProgress[0] -= amount;
+            bossBar.progress(Math.max(0.0F, currentProgress[0]));
+        }, interval, interval);
     }
 }

@@ -14,6 +14,7 @@ import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.api.service.identifier.Identifiers;
 import org.betonquest.betonquest.conversation.Conversation;
 import org.betonquest.betonquest.database.Saver;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.Location;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
@@ -112,7 +113,7 @@ public class ConversationStarter {
         activeConversations.put(onlineProfile, conversation);
         final QuestPackage pack = conversationID.getPackage();
         log.debug(pack, "Starting conversation '" + conversationID + "' for '" + onlineProfile + "'.");
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+        Scheduling.runAsync(plugin, () -> {
             if (!new PlayerConversationStartEvent(onlineProfile, conversation).callEvent()) {
                 log.debug(pack, "Conversation '" + conversationID + "' for '" + onlineProfile + "' has been "
                         + "canceled because its PlayerConversationStartEvent has been canceled.");

@@ -13,7 +13,7 @@ import org.betonquest.betonquest.api.quest.objective.ObjectiveState;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveProperties;
 import org.betonquest.betonquest.api.quest.objective.service.ObjectiveService;
 import org.betonquest.betonquest.quest.action.IngameNotificationSender;
-import org.bukkit.Bukkit;
+import org.betonquest.betonquest.thread.Scheduling;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerExpChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -117,7 +117,7 @@ public class ExperienceObjective extends DefaultObjective {
      */
     public void onExpChangeEvent(final PlayerExpChangeEvent event, final OnlineProfile onlineProfile) {
         final Player player = event.getPlayer();
-        Bukkit.getScheduler().runTask(BetonQuest.getInstance(), () -> {
+        Scheduling.runForEntity(BetonQuest.getInstance(), player, () -> {
             final double newAmount = player.getLevel() + player.getExp();
             getExceptionHandler().handle(() -> onExperienceChange(onlineProfile, newAmount, false));
         });

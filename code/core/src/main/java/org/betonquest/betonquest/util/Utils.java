@@ -35,6 +35,22 @@ public final class Utils {
      */
     public static Map<OnlineProfile, Double> getParty(final ConditionManager conditionManager, final Collection<OnlineProfile> profiles,
                                                       final Location location, final double range, final List<ConditionIdentifier> conditions) {
+        return getPartyCandidates(profiles, location, range).entrySet().stream()
+                .filter(entry -> conditionManager.testAll(entry.getKey(), conditions))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    /**
+     * Gets the profiles in range of the location, without checking any conditions.
+     * A range of 0 means worldwide and -1 means server-wide.
+     *
+     * @param profiles the online profiles in question
+     * @param location the location to get the party of
+     * @param range    the range of the party
+     * @return the profiles in range with their squared distance to the location
+     */
+    public static Map<OnlineProfile, Double> getPartyCandidates(final Collection<OnlineProfile> profiles, final Location location,
+                                                                final double range) {
         final World world = location.getWorld();
         final double squared = range * range;
 
@@ -42,9 +58,7 @@ public final class Utils {
         final Stream<OnlineProfile> worldPlayers = range == -1 ? players : players.filter(profile -> world.equals(profile.getPlayer().getWorld()));
         final Stream<Pair<OnlineProfile, Double>> distancePlayers = worldPlayers.map(profile -> Pair.of(profile, getDistanceSquared(profile, location)));
         final Stream<Pair<OnlineProfile, Double>> rangePlayers = range <= 0 ? distancePlayers : distancePlayers.filter(pair -> pair.right() <= squared);
-        return rangePlayers
-                .filter(pair -> conditionManager.testAll(pair.left(), conditions))
-                .collect(Collectors.toMap(Pair::left, Pair::right));
+        return rangePlayers.collect(Collectors.toMap(Pair::left, Pair::right));
     }
 
     private static double getDistanceSquared(final OnlineProfile profile, final Location loc) {

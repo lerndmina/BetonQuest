@@ -10,22 +10,27 @@ import org.betonquest.betonquest.api.profile.ProfileProvider;
 import org.betonquest.betonquest.api.quest.npc.Npc;
 import org.betonquest.betonquest.api.service.condition.ConditionManager;
 import org.betonquest.betonquest.api.service.npc.NpcManager;
+import org.betonquest.betonquest.thread.ProfileThreads;
+import org.betonquest.betonquest.thread.Scheduling;
+import org.betonquest.betonquest.thread.TaskHandle;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link BukkitRunnable} that shows an EffectLib effect to all players that meet the required conditions.
+ * A repeating task that shows an EffectLib effect to all players that meet the required conditions.
  */
-public class EffectLibRunnable extends BukkitRunnable {
+public class EffectLibRunnable implements Runnable {
 
     /**
      * Custom {@link BetonQuestLogger} instance for this class.
@@ -64,13 +69,26 @@ public class EffectLibRunnable extends BukkitRunnable {
 
     /**
      * All player profiles that meet the conditions for this classes' effect.
+     * Replaced as a whole once the conditions of all players were checked, each on the thread owning the player.
      */
-    private List<OnlineProfile> activeProfiles;
+    private volatile List<OnlineProfile> activeProfiles;
+
+    /**
+     * The plugin running this effect, null until started.
+     */
+    @Nullable
+    private Plugin plugin;
 
     /**
      * The last game tick the conditions were checked on.
      */
     private int lastConditionCheckTick;
+
+    /**
+     * The running task, null until started.
+     */
+    @Nullable
+    private TaskHandle task;
 
     /**
      * Constructs this runnable with the given effect.
@@ -86,7 +104,6 @@ public class EffectLibRunnable extends BukkitRunnable {
     public EffectLibRunnable(final BetonQuestLogger log, final ProfileProvider profileProvider,
                              final EffectManager manager, final EffectConfiguration effectConfiguration,
                              final NpcManager npcManager, final ConditionManager conditionManager) throws QuestException {
-        super();
         this.log = log;
         this.profileProvider = profileProvider;
         this.manager = manager;
@@ -97,28 +114,68 @@ public class EffectLibRunnable extends BukkitRunnable {
         this.conditionCheckInterval = effectConfiguration.conditionCheckInterval().getValue(null).intValue();
     }
 
+    /**
+     * Starts showing the effect on the global region.
+     *
+     * @param plugin   the plugin to schedule the task for
+     * @param delay    the initial delay in ticks
+     * @param interval the interval in ticks
+     */
+    public void start(final Plugin plugin, final long delay, final long interval) {
+        this.plugin = plugin;
+        task = Scheduling.runGlobalTimer(plugin, scheduled -> run(), delay, interval);
+    }
+
+    /**
+     * Stops showing the effect.
+     */
+    public void cancel() {
+        if (task != null) {
+            task.cancel();
+            task = null;
+        }
+    }
+
     @Override
     public void run() {
         if (Bukkit.getCurrentTick() - lastConditionCheckTick >= conditionCheckInterval) {
-            activeProfiles = checkActiveEffects();
+            checkActiveEffects();
             lastConditionCheckTick = Bukkit.getCurrentTick();
         }
         activateEffects(activeProfiles);
     }
 
-    private List<OnlineProfile> checkActiveEffects() {
-        final List<OnlineProfile> activePlayerEffects = new ArrayList<>();
-        for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
-            try {
-                if (conditionManager.testAll(onlineProfile, effectConfiguration.conditions().getValue(onlineProfile))) {
+    /**
+     * Checks the conditions of every online player on the thread owning that player and replaces the active
+     * profiles once all were checked. On Paper this completes directly on the main thread.
+     */
+    private void checkActiveEffects() {
+        final Plugin owner = plugin;
+        if (owner == null) {
+            final List<OnlineProfile> activePlayerEffects = new ArrayList<>();
+            for (final OnlineProfile onlineProfile : profileProvider.getOnlineProfiles()) {
+                if (meetsConditions(onlineProfile)) {
                     activePlayerEffects.add(onlineProfile);
                 }
-            } catch (final QuestException e) {
-                log.warn("Could not check conditions for effectlib effect '%s' for profile '%s': %s".formatted(
-                        effectConfiguration.settings().getName(), onlineProfile, e.getMessage()), e);
             }
+            activeProfiles = activePlayerEffects;
+            return;
         }
-        return activePlayerEffects;
+        ProfileThreads.supplyEach(owner, profileProvider.getOnlineProfiles(), this::meetsConditions)
+                .thenAccept(results -> activeProfiles = results.entrySet().stream()
+                        .filter(Map.Entry::getValue)
+                        .map(Map.Entry::getKey)
+                        .toList());
+    }
+
+    private boolean meetsConditions(final OnlineProfile onlineProfile) {
+        try {
+            return conditionManager.testAll(onlineProfile, effectConfiguration.conditions().getValue(onlineProfile));
+        } catch (final QuestException e) {
+            log.warn("Could not check conditions for effectlib effect '%s' for profile '%s': %s".formatted(
+                    effectConfiguration.settings().getName(), onlineProfile, e.getMessage()), e);
+            return false;
+        }
     }
 
     private void activateEffects(final List<OnlineProfile> activePlayers) {
